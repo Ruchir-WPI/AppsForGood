@@ -1,6 +1,6 @@
 const { NODE_TYPES } = require("../models/Node");
 
-module.exports = {
+const campusData = {
   buildings: [
     {
       id: "building-main",
@@ -183,4 +183,69 @@ module.exports = {
     { id: "edge-11", fromNodeId: "node-f2-junction", toNodeId: "node-f2-room-201", distance: 10 },
     { id: "edge-12", fromNodeId: "node-f2-junction", toNodeId: "node-f2-room-202", distance: 10 },
   ],
+  entrances: [
+    {
+      id: "entrance-main",
+      buildingId: "building-main",
+      label: "Main Entrance",
+      outdoor: { lng: -71.7601, lat: 42.2621 },
+      indoorNodeId: "node-f1-entrance",
+      wheelchairAccessible: true,
+    },
+    {
+      id: "entrance-north",
+      buildingId: "building-main",
+      label: "North Entrance",
+      outdoor: { lng: -71.7597, lat: 42.2625 },
+      indoorNodeId: "node-f1-stairs",
+      wheelchairAccessible: false,
+    },
+    {
+      id: "entrance-east",
+      buildingId: "building-main",
+      label: "East Entrance",
+      outdoor: { lng: -71.7595, lat: 42.2621 },
+      indoorNodeId: "node-f1-elevator",
+      wheelchairAccessible: true,
+    },
+  ],
+  outdoorPoints: [
+    {
+      id: "garage-east",
+      label: "East Parking Garage",
+      type: "parking_garage",
+      location: { lng: -71.7588, lat: 42.2623 },
+    },
+    {
+      id: "garage-west",
+      label: "West Parking Garage",
+      type: "parking_garage",
+      location: { lng: -71.7612, lat: 42.2622 },
+    },
+    {
+      id: "dropoff-main",
+      label: "Main Drop-off",
+      type: "dropoff",
+      location: { lng: -71.7603, lat: 42.2620 },
+    },
+  ],
+};
+
+function getEntranceById(id) {
+  return campusData.entrances.find((entrance) => entrance.id === id) || null;
+}
+
+function getBuildingEntrances(buildingId) {
+  return campusData.entrances.filter((entrance) => entrance.buildingId === buildingId);
+}
+
+function getOutdoorPointById(id) {
+  return campusData.outdoorPoints.find((point) => point.id === id) || null;
+}
+
+module.exports = {
+  ...campusData,
+  getEntranceById,
+  getBuildingEntrances,
+  getOutdoorPointById,
 };
