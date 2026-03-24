@@ -39,9 +39,31 @@ class RouteNotFoundError extends AppError {
   }
 }
 
+class UpstreamApiError extends AppError {
+  constructor(message, details = null, statusCode = 502) {
+    super(message, {
+      code: "UPSTREAM_API_ERROR",
+      statusCode,
+      details,
+    });
+  }
+}
+
+class ConfigError extends AppError {
+  constructor(message, details = null) {
+    super(message, {
+      code: "CONFIG_ERROR",
+      statusCode: 500,
+      details,
+    });
+  }
+}
+
 module.exports = {
   AppError,
   ValidationError,
   NotFoundError,
   RouteNotFoundError,
+  UpstreamApiError,
+  ConfigError,
 };
