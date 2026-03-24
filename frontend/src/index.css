@@ -1,214 +1,263 @@
 .wrapper {
-  display: "flex",
-  height: "580px",
-  borderRadius: "12px",
-  overflow: "hidden",
-  border: "1px solid #e0e0e0",
-  fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
-  boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+  display: flex;
+  height: 580px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #e0e0e0;
+  font-family: 'DM Sans', 'Segoe UI', sans-serif;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 }
 
 .sidebar {
-  width: "340px",
-  minWidth: "340px",
-  background: "#fff",
-  display: "flex",
-  flexDirection: "column",
-  borderRight: "1px solid #e8e8e8",
-  zIndex: 10,
+  width: 340px;
+  min-width: 340px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #e8e8e8;
+  z-index: 10;
 }
+
 .sidebarHeader {
-  padding: "14px 16px 0",
+  padding: 14px 16px 0;
 }
+
 .logo {
-  fontSize: "12px",
-  fontWeight: 600,
-  color: "#666",
-  letterSpacing: "0.06em",
-  textTransform: "uppercase",
-  marginBottom: "10px",
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
 }
+
 .routePanel {
-  paddingBottom: "12px",
-  borderBottom: "1px solid #f0f0f0",
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
 }
+
 .routeRow {
-  display: "flex",
-  alignItems: "center",
-  gap: "8px",
-  marginBottom: "6px",
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
 }
+
 .routeDot {
-  width: "10px",
-  height: "10px",
-  borderRadius: "50%",
-  flexShrink: 0,
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
+
+.routeDotStart {
+  background: #1a73e8;
+}
+
+.routeDotEnd {
+  background: #ea4335;
+}
+
 .routeLine {
-  width: "1px",
-  height: "14px",
-  background: "#ddd",
-  marginLeft: "19px",
-  marginBottom: "6px",
+  width: 1px;
+  height: 14px;
+  background: #ddd;
+  margin-left: 19px;
+  margin-bottom: 6px;
 }
+
 .select {
-  flex: 1,
-  fontSize: "13px",
-  border: "1px solid #e0e0e0",
-  borderRadius: "8px",
-  padding: "7px 8px",
-  background: "#fafafa",
-  color: "#333",
-  outline: "none",
-  cursor: "pointer",
+  flex: 1;
+  font-size: 13px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 7px 8px;
+  background: #fafafa;
+  color: #333;
+  outline: none;
+  cursor: pointer;
 }
+
 .goBtn {
-  width: "100%",
-  marginTop: "8px",
-  padding: "9px",
-  background: "#1a73e8",
-  color: "white",
-  border: "none",
-  borderRadius: "8px",
-  fontSize: "14px",
-  fontWeight: 600,
-  cursor: "pointer",
-  transition: "background 0.15s",
+  width: 100%;
+  margin-top: 8px;
+  padding: 9px;
+  background: #1a73e8;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
 }
+
+.goBtn:hover {
+  background: #1557b0;
+}
+
+.goBtnLoading {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
 .routeInfo {
-  padding: "10px 16px",
-  borderBottom: "1px solid #f0f0f0",
+  padding: 10px 16px;
+  border-bottom: 1px solid #f0f0f0;
 }
+
 .routeMeta {
-  display: "flex",
-  gap: "20px",
+  display: flex;
+  gap: 20px;
 }
+
 .routeStat {
-  fontSize: "12px",
-  color: "#888",
+  font-size: 12px;
+  color: #888;
 }
+
 .routeStatNum {
-  fontSize: "15px",
-  fontWeight: 600,
-  color: "#222",
-  display: "block",
+  font-size: 15px;
+  font-weight: 600;
+  color: #222;
+  display: block;
 }
+
 .errorBanner {
-  background: "#fce8e6",
-  color: "#c62828",
-  fontSize: "12px",
-  padding: "8px 16px",
-  borderBottom: "1px solid #f5c6c2",
+  background: #fce8e6;
+  color: #c62828;
+  font-size: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid #f5c6c2;
 }
+
 .stepsList {
-  flex: 1,
-  overflowY: "auto",
-  padding: "6px 0",
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 0;
 }
+
 .stepItem {
-  display: "flex",
-  gap: "10px",
-  alignItems: "flex-start",
-  padding: "8px 16px",
-  cursor: "default",
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 16px;
+  cursor: default;
 }
+
 .stepIcon {
-  width: "28px",
-  height: "28px",
-  borderRadius: "50%",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  flexShrink: 0,
-  marginTop: "2px",
-  fontSize: "12px",
-  fontWeight: 600,
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 600;
 }
+
 .iconNav {
-  background: "#e8f0fe",
-  color: "#1a73e8",
+  background: #e8f0fe;
+  color: #1a73e8;
 }
+
 .iconDest {
-  background: "#fce8e6",
-  color: "#ea4335",
+  background: #fce8e6;
+  color: #ea4335;
 }
+
 .iconInfo {
-  background: "#f5f5f5",
-  color: "#888",
+  background: #f5f5f5;
+  color: #888;
 }
+
 .stepText {
-  flex: 1,
+  flex: 1;
 }
+
 .stepTitle {
-  fontSize: "13px",
-  fontWeight: 500,
-  color: "#222",
-  lineHeight: 1.4,
+  font-size: 13px;
+  font-weight: 500;
+  color: #222;
+  line-height: 1.4;
 }
+
 .stepSub {
-  fontSize: "12px",
-  color: "#888",
-  marginTop: "1px",
+  font-size: 12px;
+  color: #888;
+  margin-top: 1px;
 }
+
 .mapArea {
-  flex: 1,
-  position: "relative",
-  background: "#e8ead3",
-  overflow: "hidden",
+  flex: 1;
+  position: relative;
+  background: #e8ead3;
+  overflow: hidden;
 }
+
 .mapSvg {
-  width: "100%",
-  height: "100%",
-  transition: "transform 0.2s ease",
+  width: 100%;
+  height: 100%;
+  transition: transform 0.2s ease;
 }
+
 .mapLabel {
-  position: "absolute",
-  top: "12px",
-  left: "12px",
-  background: "rgba(255,255,255,0.92)",
-  border: "1px solid #e0e0e0",
-  borderRadius: "8px",
-  padding: "4px 10px",
-  fontSize: "11px",
-  fontWeight: 500,
-  color: "#555",
-  zIndex: 5,
-  backdropFilter: "blur(4px)",
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #555;
+  z-index: 5;
+  backdrop-filter: blur(4px);
 }
+
 .mapControls {
-  position: "absolute",
-  right: "12px",
-  bottom: "24px",
-  display: "flex",
-  flexDirection: "column",
-  gap: "4px",
-  zIndex: 5,
+  position: absolute;
+  right: 12px;
+  bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 5;
 }
+
 .mapBtn {
-  width: "32px",
-  height: "32px",
-  background: "rgba(255,255,255,0.95)",
-  border: "1px solid #e0e0e0",
-  borderRadius: "8px",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  cursor: "pointer",
-  fontSize: "16px",
-  color: "#333",
-  lineHeight: 1,
+  width: 32px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  color: #333;
+  line-height: 1;
 }
+
+.mapBtn:hover {
+  background: #f5f5f5;
+}
+
 .toast {
-  position: "absolute",
-  bottom: "60px",
-  left: "50%",
-  transform: "translateX(-50%)",
-  background: "rgba(50,50,50,0.9)",
-  color: "white",
-  padding: "8px 16px",
-  borderRadius: "20px",
-  fontSize: "13px",
-  pointerEvents: "none",
-  whiteSpace: "nowrap",
-  zIndex: 10,
+  position: absolute;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(50, 50, 50, 0.9);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 10;
 }
