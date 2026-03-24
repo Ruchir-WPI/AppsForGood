@@ -11,7 +11,7 @@ The backend is a Node.js + Express service in `backend/` with a single routing e
 
 ### Environment Variables
 
-Set these in `backend/.env` (or your process environment):
+Set these in the repo-root `.env` (or your process environment):
 
 - `PORT` (optional, defaults to `3001`)
 - `MAPBOX_ACCESS_TOKEN` (required for hybrid/outdoor routing)

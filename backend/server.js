@@ -1,6 +1,6 @@
 const path = require("node:path");
 require("dotenv").config({
-  path: process.env.ENV_FILE || path.resolve(__dirname, ".env"),
+  path: process.env.ENV_FILE || path.resolve(__dirname, "..", ".env"),
 });
 const express = require("express");
 const cors = require("cors");
