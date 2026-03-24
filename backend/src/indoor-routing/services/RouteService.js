@@ -22,6 +22,24 @@ class RouteService {
 
   computeRoute(request) {
     const normalized = this.#normalizeRequest(request);
+    return this.computeIndoorRoute({
+      start: normalized.start,
+      destination: normalized.destination,
+      buildingId: normalized.buildingId,
+      options: normalized.options,
+    });
+  }
+
+  computeIndoorRoute({ start, destination, buildingId = null, options = {} }) {
+    this.#validateEndpoint(start, "start");
+    this.#validateEndpoint(destination, "destination");
+
+    const normalized = {
+      start,
+      destination,
+      buildingId,
+      options,
+    };
     const startCandidates = this.#resolveEndpointNodes(normalized.start, normalized.buildingId, "start");
     const destinationCandidates = this.#resolveEndpointNodes(
       normalized.destination,
@@ -123,6 +141,10 @@ class RouteService {
   }
 
   #validateEndpoint(endpoint, fieldName) {
+    if (!endpoint || typeof endpoint !== "object" || Array.isArray(endpoint)) {
+      throw new ValidationError(`${fieldName} must be an object.`);
+    }
+
     const hasNodeId = Boolean(endpoint.nodeId);
     const hasRoomId = Boolean(endpoint.roomId);
 
