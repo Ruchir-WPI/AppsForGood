@@ -10,22 +10,22 @@ const InMemoryMapRepository = require("./repositories/InMemoryMapRepository");
 const sampleCampus = require("./data/sampleCampus");
 
 function createSampleRouteService() {
-  const repository = new InMemoryMapRepository(sampleCampus);
-  return new RouteService({ mapRepository: repository });
+    const repository = new InMemoryMapRepository(sampleCampus);
+    return new RouteService({ mapRepository: repository });
 }
 
 module.exports = {
-  Building,
-  Floor,
-  Room,
-  Node,
-  NODE_TYPES,
-  Edge,
-  Graph,
-  aStar,
-  defaultHeuristic,
-  RouteService,
-  InMemoryMapRepository,
-  sampleCampus,
-  createSampleRouteService,
+    Building,
+    Floor,
+    Room,
+    Node,
+    NODE_TYPES,
+    Edge,
+    Graph,
+    aStar,
+    defaultHeuristic,
+    RouteService,
+    InMemoryMapRepository,
+    sampleCampus,
+    createSampleRouteService,
 };
