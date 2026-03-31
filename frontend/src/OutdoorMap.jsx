@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "./OutdoorMap.css";
+import { fetchGeocodeSuggestions, fetchOutdoorRoute } from "./api/navigationApi";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -18,65 +19,6 @@ const UMASS_MEMORIAL = {
 
 // Zoom in past this threshold to show the "Enter Building" button
 const ARRIVAL_ZOOM_THRESHOLD = 17;
-
-// ── Mapbox Directions API ─────────────────────────────────────────────────────
-
-/**
- * Fetches a walking route from the Mapbox Directions API.
- *
- * Docs: https://docs.mapbox.com/api/navigation/directions/
- *
- * @param {[number, number]} origin  - [lng, lat]
- * @param {[number, number]} dest    - [lng, lat]
- * @returns {{ route: object, steps: object[] } | null}
- */
-async function fetchDirections(origin, dest) {
-    const coords = `${origin[0]},${origin[1]};${dest[0]},${dest[1]}`;
-    const url = new URL(
-        `https://api.mapbox.com/directions/v5/mapbox/walking/${coords}`
-    );
-    url.searchParams.set("access_token", mapboxgl.accessToken);
-    url.searchParams.set("steps", "true");
-    url.searchParams.set("geometries", "geojson");
-    url.searchParams.set("overview", "full");
-    url.searchParams.set("language", "en");
-
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Directions API error: ${res.status}`);
-    const data = await res.json();
-
-    if (!data.routes?.length) return null;
-
-    const route = data.routes[0];
-    // Flatten all steps from all legs into a single list
-    const steps = route.legs.flatMap((leg) => leg.steps);
-    return { route, steps };
-}
-
-/**
- * Fetches address suggestions from the Mapbox Geocoding API.
- *
- * Docs: https://docs.mapbox.com/api/search/geocoding/
- *
- * @param {string} query
- * @returns {object[]} - Array of feature suggestions
- */
-async function fetchGeocodeSuggestions(query) {
-    if (!query || query.length < 3) return [];
-    const url = new URL(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json`
-    );
-    url.searchParams.set("access_token", mapboxgl.accessToken);
-    url.searchParams.set("autocomplete", "true");
-    url.searchParams.set("country", "us");
-    url.searchParams.set("types", "address,place,poi");
-    url.searchParams.set("limit", "5");
-
-    const res = await fetch(url);
-    if (!res.ok) return [];
-    const data = await res.json();
-    return data.features ?? [];
-}
 
 // ── Utility ───────────────────────────────────────────────────────────────────
 
@@ -132,8 +74,6 @@ export default function OutdoorMap({ onEnterBuilding }) {
             center: [UMASS_MEMORIAL.lng, UMASS_MEMORIAL.lat],
             zoom: 14,
         });
-
-        console.log(document.querySelector('.outdoorMapCanvas').getBoundingClientRect());
 
         map.addControl(new mapboxgl.NavigationControl(), "bottom-right");
 
@@ -254,9 +194,16 @@ export default function OutdoorMap({ onEnterBuilding }) {
         setAddressInput(value);
         if (value === "My current location") return;
         setGeoStatus("idle");
-        const results = await fetchGeocodeSuggestions(value);
-        setSuggestions(results);
-        setShowSuggestions(results.length > 0);
+
+        try {
+            const results = await fetchGeocodeSuggestions(value);
+            setSuggestions(results);
+            setShowSuggestions(results.length > 0);
+        } catch (err) {
+            setSuggestions([]);
+            setShowSuggestions(false);
+            setError(err.message || "Failed to load address suggestions.");
+        }
     }, []);
 
     const handleSelectSuggestion = useCallback((feature) => {
@@ -281,9 +228,12 @@ export default function OutdoorMap({ onEnterBuilding }) {
         clearRoute();
 
         try {
-            const dest = [UMASS_MEMORIAL.lng, UMASS_MEMORIAL.lat];
-            const result = await fetchDirections(userLocation, dest);
-            if (!result) {
+            const result = await fetchOutdoorRoute({
+                start: { lng: userLocation[0], lat: userLocation[1] },
+                destination: { lng: UMASS_MEMORIAL.lng, lat: UMASS_MEMORIAL.lat },
+            });
+
+            if (!result?.route?.geometry) {
                 setError("No route found. Please try a different starting location.");
                 return;
             }
@@ -291,8 +241,8 @@ export default function OutdoorMap({ onEnterBuilding }) {
             const { route, steps: routeSteps } = result;
             drawRoute(route.geometry);
             setRouteInfo({
-                distanceM: route.distance,
-                durationS: route.duration,
+                distanceM: route.distanceMeters,
+                durationS: route.durationSeconds,
             });
             setSteps(routeSteps);
             setActiveStep(0);
@@ -410,9 +360,16 @@ export default function OutdoorMap({ onEnterBuilding }) {
                                 key={i}
                                 className={`stepItem${i === activeStep ? " stepItemActive" : ""}`}
                                 onClick={() => {
+                                    if (
+                                        typeof step.location?.lng !== "number"
+                                        || typeof step.location?.lat !== "number"
+                                    ) {
+                                        return;
+                                    }
+
                                     setActiveStep(i);
                                     mapRef.current?.flyTo({
-                                        center: step.maneuver.location,
+                                        center: [step.location.lng, step.location.lat],
                                         zoom: 17,
                                     });
                                 }}
@@ -422,11 +379,11 @@ export default function OutdoorMap({ onEnterBuilding }) {
                                 </div>
                                 <div className="stepText">
                                     <div className="stepInstruction">
-                                        {step.maneuver.instruction}
+                                        {step.instruction}
                                     </div>
                                     <div className="stepMeta">
-                                        {formatDistance(step.distance)}
-                                        {step.name ? ` · ${step.name}` : ""}
+                                        {formatDistance(step.distanceMeters)}
+                                        {step.maneuverType ? ` · ${step.maneuverType}` : ""}
                                     </div>
                                 </div>
                             </div>
