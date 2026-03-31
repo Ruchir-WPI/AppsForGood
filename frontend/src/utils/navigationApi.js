@@ -1,4 +1,8 @@
-const API_BASE = "/api";
+import {
+    API_BASE,
+    DEFAULT_GEOCODE_LIMIT,
+    MIN_GEOCODE_QUERY_LENGTH,
+} from "../constants/api";
 
 async function parseJson(response) {
     const text = await response.text();
@@ -25,7 +29,10 @@ async function requestJson(path, options = {}) {
     const payload = await parseJson(response);
 
     if (!response.ok) {
-        const message = payload?.message || `Request failed with status ${response.status}.`;
+        let message = payload?.message || `Request failed with status ${response.status}.`;
+        if (!payload?.message && response.status === 502) {
+            message = "Cannot reach the backend API. Start the backend server on http://localhost:3001 and try again.";
+        }
         const error = new Error(message);
         error.status = response.status;
         error.code = payload?.error || "HTTP_ERROR";
@@ -55,9 +62,9 @@ export async function fetchOutdoorRoute({ start, destination }) {
     });
 }
 
-export async function fetchGeocodeSuggestions(query, { limit = 5 } = {}) {
+export async function fetchGeocodeSuggestions(query, { limit = DEFAULT_GEOCODE_LIMIT } = {}) {
     const normalizedQuery = typeof query === "string" ? query.trim() : "";
-    if (normalizedQuery.length < 3) {
+    if (normalizedQuery.length < MIN_GEOCODE_QUERY_LENGTH) {
         return [];
     }
 

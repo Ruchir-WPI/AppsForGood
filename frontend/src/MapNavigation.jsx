@@ -1,25 +1,11 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import "./MapNavigation.css";
-import { fetchIndoorBuildings, fetchIndoorRoute } from "./api/navigationApi";
-
-// ── Constants ────────────────────────────────────────────────────────────────
-
-const TYPE_COLORS = {
-  clinical:  { fill: "#b8c0e0", stroke: "#8890c0", text: "#2a3060" },
-  research:  { fill: "#d0c8e8", stroke: "#9088c0", text: "#3a2860" },
-  parking:   { fill: "#ccc8b0", stroke: "#a0a080", text: "#555544" },
-  admin:     { fill: "#c8d8b8", stroke: "#88a880", text: "#2a4020" },
-  academic:  { fill: "#b8c8e0", stroke: "#7090c0", text: "#1a3060" },
-};
-const PATIENT_BUILDING_TYPES = new Set(["clinical", "parking", "admin"]);
-
-// ── Utility ───────────────────────────────────────────────────────────────────
+import { fetchIndoorBuildings, fetchIndoorRoute } from "./utils/navigationApi";
+import { PATIENT_BUILDING_TYPES, TYPE_COLORS } from "./constants/mapNavigation";
 
 function waypointsToPoints(wps) {
     return wps.map((p) => `${p.x},${p.y}`).join(" ");
 }
-
-// ── Sub-components ────────────────────────────────────────────────────────────
 
 function BuildingRect({ b, isStart, isEnd, isHighlighted }) {
     const colors = TYPE_COLORS[b.type] || TYPE_COLORS.clinical;
@@ -92,8 +78,6 @@ function StepItem({ icon, iconClassName, title, subtitle }) {
         </div>
     );
 }
-
-// ── Main component ────────────────────────────────────────────────────────────
 
 export default function MapNavigation() {
     const [buildings, setBuildings] = useState([]);
@@ -178,12 +162,10 @@ export default function MapNavigation() {
 
     return (
         <div className="wrapper">
-            {/* ── Sidebar ── */}
             <div className="sidebar">
                 <div className="sidebarHeader">
                     <div className="logo">UMass Chan Navigation</div>
 
-                    {/* Route inputs */}
                     <div className="routePanel">
                         <div className="routeRow">
                             <div className="routeDot routeDotStart" />
@@ -224,7 +206,6 @@ export default function MapNavigation() {
                     </div>
                 </div>
 
-                {/* Route stats */}
                 {routeData && (
                     <div className="routeInfo">
                         <div className="routeMeta">
@@ -248,7 +229,6 @@ export default function MapNavigation() {
                     <div className="errorBanner">{error}</div>
                 )}
 
-                {/* Steps list */}
                 <div className="stepsList">
                     {!routeData ? (
                         <StepItem
@@ -284,7 +264,6 @@ export default function MapNavigation() {
                 </div>
             </div>
 
-            {/* ── Map ── */}
             <div className="mapArea">
                 <div className="mapLabel">UMass Chan Medical School — Worcester, MA</div>
 
@@ -300,10 +279,8 @@ export default function MapNavigation() {
                         </marker>
                     </defs>
 
-                    {/* Background */}
                     <rect x={0} y={0} width={700} height={580} fill="#e8ead3" />
 
-                    {/* Roads */}
                     <line x1={0} y1={520} x2={700} y2={520} stroke="#c9c9a0" strokeWidth={14} />
                     <text x={10} y={516} fontSize={9} fill="#888" fontFamily="sans-serif">Plantation Street</text>
                     <line x1={0} y1={480} x2={700} y2={480} stroke="#d4d6ba" strokeWidth={8} />
@@ -320,7 +297,6 @@ export default function MapNavigation() {
                     <line x1={100} y1={180} x2={580} y2={180} stroke="#dddfc5" strokeWidth={4} />
                     <text x={102} y={176} fontSize={8} fill="#aaa" fontFamily="sans-serif">Innovation Drive</text>
 
-                    {/* Green quads */}
                     {[
                         [220, 310, "Quad 1"], [310, 310, "Quad 2"],
                         [220, 220, "Quad 3"], [310, 220, "Quad 4"],
@@ -331,7 +307,6 @@ export default function MapNavigation() {
                         </g>
                     ))}
 
-                    {/* Buildings */}
                     {buildings.map((b) => (
                         <BuildingRect
                             key={b.id}
@@ -342,7 +317,6 @@ export default function MapNavigation() {
                         />
                     ))}
 
-                    {/* Route path */}
                     {waypoints.length > 1 && (
                         <polyline
                             points={waypointsToPoints(waypoints)}
@@ -357,7 +331,6 @@ export default function MapNavigation() {
                         />
                     )}
 
-                    {/* Start / end markers */}
                     {routeData && fromBuilding && (
                         <RouteMarker cx={fromBuilding.cx} cy={fromBuilding.cy} type="start" />
                     )}
@@ -365,7 +338,6 @@ export default function MapNavigation() {
                         <RouteMarker cx={toBuilding.cx} cy={toBuilding.cy} type="end" />
                     )}
 
-                    {/* Compass */}
                     <g transform="translate(655,50)">
                         <circle cx={0} cy={0} r={16} fill="white" stroke="#ccc" strokeWidth={0.5} />
                         <text x={0} y={-4} fontSize={10} fill="#d32" textAnchor="middle" fontFamily="sans-serif" fontWeight="bold">N</text>
@@ -374,14 +346,12 @@ export default function MapNavigation() {
                     </g>
                 </svg>
 
-                {/* Zoom controls */}
                 <div className="mapControls">
                     <button className="mapBtn" onClick={() => setZoom((z) => Math.min(z + 0.15, 2.5))}>+</button>
                     <button className="mapBtn" onClick={() => setZoom((z) => Math.max(z - 0.15, 0.5))}>−</button>
                     <button className="mapBtn" onClick={() => setZoom(1)} title="Reset zoom">⊙</button>
                 </div>
 
-                {/* Toast */}
                 {toast && <div className="toast">{toast}</div>}
             </div>
         </div>

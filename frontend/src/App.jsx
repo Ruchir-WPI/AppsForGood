@@ -2,13 +2,6 @@ import { useState } from "react";
 import OutdoorMap from "./OutdoorMap.jsx";
 import MapNavigation from "./MapNavigation.jsx";
 
-/**
- * Two-mode app:
- *   "outdoor" — Mapbox walking directions to UMass Memorial
- *   "indoor"  — SVG campus map for navigating within the building
- *
- * Swap the mode by calling setMode() from either child component.
- */
 export default function App() {
     const [mode, setMode] = useState("outdoor");
 
@@ -18,7 +11,6 @@ export default function App() {
         <div style={{ position: "relative", height: "100vh" }}>
             <MapNavigation />
 
-            {/* Back to outdoor map */}
             <button
                 onClick={() => setMode("outdoor")}
                 style={{

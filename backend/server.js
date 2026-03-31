@@ -159,7 +159,6 @@ function startServer() {
   const app = createApp();
   const port = process.env.PORT || 3001;
   app.listen(port, () => {
-    // Keep startup logs concise for container/dev environments.
     console.log(`Backend listening on port ${port}`);
   });
 }

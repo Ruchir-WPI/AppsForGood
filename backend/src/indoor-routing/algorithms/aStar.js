@@ -2,7 +2,6 @@ const PriorityQueue = require("./PriorityQueue");
 const { ValidationError } = require("../utils/errors");
 
 function defaultHeuristic(currentNode, goalNode) {
-    // Keep the heuristic admissible by only using planar distance on the same floor.
     if (
         currentNode.buildingId !== goalNode.buildingId ||
         currentNode.floorId !== goalNode.floorId
@@ -66,7 +65,6 @@ function aStar({
         const currentNodeId = currentEntry.value;
         visitedNodeCount += 1;
 
-        // Ignore outdated queue entries when a better path is already known.
         if ((fScore.get(currentNodeId) ?? Infinity) < currentEntry.priority) {
             continue;
         }

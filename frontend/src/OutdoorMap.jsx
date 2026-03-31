@@ -2,25 +2,10 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "./OutdoorMap.css";
-import { fetchGeocodeSuggestions, fetchOutdoorRoute } from "./api/navigationApi";
+import { fetchGeocodeSuggestions, fetchOutdoorRoute } from "./utils/navigationApi";
+import { ARRIVAL_ZOOM_THRESHOLD, UMASS_MEMORIAL } from "./constants/outdoorMap";
 
-// ── Config ────────────────────────────────────────────────────────────────────
-
-// Replace with your actual Mapbox public token from https://account.mapbox.com
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
-
-// UMass Memorial Medical Center — main entrance
-const UMASS_MEMORIAL = {
-    lng: -71.7654,
-    lat: 42.2776,
-    label: "UMass Memorial Medical Center",
-    address: "55 Lake Ave N, Worcester, MA 01655",
-};
-
-// Zoom in past this threshold to show the "Enter Building" button
-const ARRIVAL_ZOOM_THRESHOLD = 17;
-
-// ── Utility ───────────────────────────────────────────────────────────────────
 
 function formatDistance(meters) {
     const feet = meters * 3.281;
@@ -35,35 +20,24 @@ function formatDuration(seconds) {
     return mins < 60 ? `${mins} min` : `${Math.floor(mins / 60)}h ${mins % 60}m`;
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
-
-/**
- * OutdoorMap
- *
- * Props:
- *   onEnterBuilding: () => void   — called when the user taps "Enter Building",
- *                                   use this to swap in your <MapNavigation /> component
- */
 export default function OutdoorMap({ onEnterBuilding }) {
     const mapContainerRef = useRef(null);
-    const mapRef          = useRef(null);
-    const mapLoadedRef    = useRef(false); // true once the style's "load" event fires
-    const userMarkerRef   = useRef(null);
-    const destMarkerRef   = useRef(null);
+    const mapRef = useRef(null);
+    const mapLoadedRef = useRef(false);
+    const userMarkerRef = useRef(null);
+    const destMarkerRef = useRef(null);
 
-    const [userLocation, setUserLocation]           = useState(null); // [lng, lat]
-    const [addressInput, setAddressInput]           = useState("");
-    const [suggestions, setSuggestions]             = useState([]);
-    const [showSuggestions, setShowSuggestions]     = useState(false);
-    const [routeInfo, setRouteInfo]                 = useState(null);
-    const [steps, setSteps]                         = useState([]);
-    const [activeStep, setActiveStep]               = useState(0);
-    const [loading, setLoading]                     = useState(false);
-    const [error, setError]                         = useState(null);
-    const [geoStatus, setGeoStatus]                 = useState("idle"); // idle | locating | found | denied
+    const [userLocation, setUserLocation] = useState(null);
+    const [addressInput, setAddressInput] = useState("");
+    const [suggestions, setSuggestions] = useState([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [routeInfo, setRouteInfo] = useState(null);
+    const [steps, setSteps] = useState([]);
+    const [activeStep, setActiveStep] = useState(0);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const [geoStatus, setGeoStatus] = useState("idle");
     const [showEnterBuilding, setShowEnterBuilding] = useState(false);
-
-    // ── Map init ──────────────────────────────────────────────────────────────
 
     useEffect(() => {
         if (mapRef.current) return;
@@ -77,8 +51,6 @@ export default function OutdoorMap({ onEnterBuilding }) {
 
         map.addControl(new mapboxgl.NavigationControl(), "bottom-right");
 
-        // Wait for the style to fully load before adding sources, layers, or markers.
-        // Touching the map before this fires causes "getOwnLayer" / "appendChild" errors.
         map.on("load", () => {
             mapLoadedRef.current = true;
 
@@ -99,14 +71,12 @@ export default function OutdoorMap({ onEnterBuilding }) {
         });
 
         mapRef.current = map;
-            return () => {
+        return () => {
             mapLoadedRef.current = false;
             map.remove();
             mapRef.current = null;
         };
     }, []);
-
-    // ── Route layer helpers ───────────────────────────────────────────────────
 
     const drawRoute = useCallback((geojsonGeometry) => {
         const map = mapRef.current;
@@ -143,8 +113,6 @@ export default function OutdoorMap({ onEnterBuilding }) {
         setActiveStep(0);
     }, []);
 
-    // ── Helpers: place or move the user marker ────────────────────────────────
-
     const placeUserMarker = useCallback((coords) => {
         const map = mapRef.current;
         if (!map || !mapLoadedRef.current) return;
@@ -159,8 +127,6 @@ export default function OutdoorMap({ onEnterBuilding }) {
                 .addTo(map);
         }
     }, []);
-
-    // ── Geolocation ───────────────────────────────────────────────────────────
 
     const locateUser = useCallback(() => {
         if (!navigator.geolocation) {
@@ -188,8 +154,6 @@ export default function OutdoorMap({ onEnterBuilding }) {
         );
     }, [placeUserMarker]);
 
-    // ── Address search ────────────────────────────────────────────────────────
-
     const handleAddressChange = useCallback(async (value) => {
         setAddressInput(value);
         if (value === "My current location") return;
@@ -215,8 +179,6 @@ export default function OutdoorMap({ onEnterBuilding }) {
         setShowSuggestions(false);
         placeUserMarker(coords);
     }, [placeUserMarker]);
-
-    // ── Get Directions ────────────────────────────────────────────────────────
 
     const handleGetDirections = useCallback(async () => {
         if (!userLocation) {
@@ -247,7 +209,6 @@ export default function OutdoorMap({ onEnterBuilding }) {
             setSteps(routeSteps);
             setActiveStep(0);
 
-            // Fit map to route bounds
             const coords = route.geometry.coordinates;
             const bounds = coords.reduce(
                 (b, c) => b.extend(c),
@@ -255,23 +216,19 @@ export default function OutdoorMap({ onEnterBuilding }) {
             );
             mapRef.current.fitBounds(bounds, { padding: 60 });
         } catch (err) {
-            setError("Failed to fetch directions. Please check your connection.");
+            setError(err?.message || "Failed to fetch directions. Please check your connection.");
             console.error(err);
         } finally {
             setLoading(false);
         }
     }, [userLocation, drawRoute, clearRoute]);
 
-    // ── Render ────────────────────────────────────────────────────────────────
-
     return (
         <div className="outdoorWrapper">
-            {/* ── Sidebar ── */}
             <div className="outdoorSidebar">
                 <div className="outdoorSidebarHeader">
                     <div className="outdoorLogo">Navigate to UMass Memorial</div>
 
-                    {/* Starting location */}
                     <div className="locationSection">
                         <div className="locationLabel">Your starting location</div>
                         <div className="locationInputRow">
@@ -314,7 +271,6 @@ export default function OutdoorMap({ onEnterBuilding }) {
                         </div>
                     </div>
 
-                    {/* Destination (fixed) */}
                     <div className="destRow">
                         <div className="destDot" />
                         <div className="destInfo">
@@ -334,7 +290,6 @@ export default function OutdoorMap({ onEnterBuilding }) {
                     {error && <div className="errorBanner">{error}</div>}
                 </div>
 
-                {/* Route summary */}
                 {routeInfo && (
                     <div className="routeSummary">
                         <div className="routeStat">
@@ -352,7 +307,6 @@ export default function OutdoorMap({ onEnterBuilding }) {
                     </div>
                 )}
 
-                {/* Turn-by-turn steps */}
                 {steps.length > 0 && (
                     <div className="stepsList">
                         {steps.map((step, i) => (
@@ -391,7 +345,6 @@ export default function OutdoorMap({ onEnterBuilding }) {
                     </div>
                 )}
 
-                {/* Enter Building button — shown when zoomed in close */}
                 {showEnterBuilding && onEnterBuilding && (
                     <div className="enterBuildingWrap">
                         <button className="enterBuildingBtn" onClick={onEnterBuilding}>
@@ -401,7 +354,6 @@ export default function OutdoorMap({ onEnterBuilding }) {
                 )}
             </div>
 
-            {/* ── Map canvas ── */}
             <div className="outdoorMapCanvas" ref={mapContainerRef} />
         </div>
     );
