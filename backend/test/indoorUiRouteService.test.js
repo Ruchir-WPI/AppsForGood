@@ -1,0 +1,40 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+
+const IndoorUiRouteService = require("../src/api/IndoorUiRouteService");
+
+test("IndoorUiRouteService lists campus buildings", () => {
+    const service = new IndoorUiRouteService();
+    const buildings = service.listBuildings();
+
+    assert.ok(Array.isArray(buildings));
+    assert.ok(buildings.length > 0);
+    assert.equal(typeof buildings[0].id, "string");
+});
+
+test("IndoorUiRouteService computes indoor-ui route contract", () => {
+    const service = new IndoorUiRouteService();
+    const route = service.computeRoute({
+        from: "west-garage",
+        to: "north-pavilion",
+    });
+
+    assert.equal(route.from, "west-garage");
+    assert.equal(route.to, "north-pavilion");
+    assert.ok(Array.isArray(route.steps));
+    assert.ok(Array.isArray(route.waypoints));
+    assert.equal(typeof route.distanceFt, "number");
+    assert.equal(typeof route.walkMinutes, "number");
+});
+
+test("IndoorUiRouteService rejects identical start and destination", () => {
+    const service = new IndoorUiRouteService();
+
+    assert.throws(
+        () => service.computeRoute({ from: "west-garage", to: "west-garage" }),
+        (error) => {
+            assert.equal(error.code, "VALIDATION_ERROR");
+            return true;
+        },
+    );
+});

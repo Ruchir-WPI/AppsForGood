@@ -1,31 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import "./MapNavigation.css";
+import { fetchIndoorBuildings, fetchIndoorRoute } from "./api/navigationApi";
 
 // ── Constants ────────────────────────────────────────────────────────────────
-
-const BUILDINGS = [
-    { id: "ambulatory",         label: "Ambulatory Care Center",   cx: 280, cy: 417, type: "clinical" },
-    { id: "albert-sherman",     label: "Albert Sherman Center",     cx: 180, cy: 417, type: "clinical" },
-    { id: "medical-school",     label: "Medical School Building",   cx: 405, cy: 417, type: "academic" },
-    { id: "lazare",             label: "Lazare Research Building",  cx: 500, cy: 417, type: "research" },
-    { id: "paul-dimare",        label: "Paul J. DiMare Center",     cx: 175, cy: 332, type: "clinical" },
-    { id: "leahy",              label: "Paul T. Leahy Center",      cx: 117, cy: 415, type: "clinical" },
-    { id: "north-pavilion",     label: "North Pavilion",            cx: 400, cy: 222, type: "clinical" },
-    { id: "shaw",               label: "Shaw Building",             cx: 495, cy: 332, type: "clinical" },
-    { id: "anderson",           label: "Anderson House",            cx: 567, cy: 410, type: "admin" },
-    { id: "benedict",           label: "Benedict Building",         cx: 482, cy: 139, type: "research" },
-    { id: "biotech1",           label: "Biotech 1",                 cx: 137, cy: 139, type: "research" },
-    { id: "biotech2",           label: "Biotech 2",                 cx: 202, cy: 139, type: "research" },
-    { id: "biotech3",           label: "Biotech 3",                 cx: 267, cy: 139, type: "research" },
-    { id: "biotech4",           label: "Biotech 4",                 cx: 332, cy: 139, type: "research" },
-    { id: "biotech5",           label: "Biotech 5",                 cx: 397, cy: 139, type: "research" },
-    { id: "west-garage",        label: "West Garage",               cx: 130, cy: 469, type: "parking" },
-    { id: "south-garage",       label: "South Garage",              cx: 390, cy: 469, type: "parking" },
-    { id: "plantation-garage",  label: "Plantation St. Garage",     cx: 552, cy: 199, type: "parking" },
-    { id: "va-building",        label: "VA Building",               cx: 567, cy: 320, type: "admin" },
-];
-
-const BUILDING_MAP = Object.fromEntries(BUILDINGS.map((b) => [b.id, b]));
 
 const TYPE_COLORS = {
   clinical:  { fill: "#b8c0e0", stroke: "#8890c0", text: "#2a3060" },
@@ -34,73 +11,12 @@ const TYPE_COLORS = {
   admin:     { fill: "#c8d8b8", stroke: "#88a880", text: "#2a4020" },
   academic:  { fill: "#b8c8e0", stroke: "#7090c0", text: "#1a3060" },
 };
-
-const PATIENT_BUILDINGS = BUILDINGS.filter((b) =>
-    ["clinical", "parking", "admin"].includes(b.type)
-);
-
-// ── API helpers ───────────────────────────────────────────────────────────────
-
-/**
- * POST /api/route
- * Body: { from: string, to: string }
- * Expected response:
- * {
- *   steps: string[],          // turn-by-turn instructions
- *   distanceFt: number,
- *   walkMinutes: number,
- *   waypoints: { x: number, y: number }[]   // SVG coordinates for the path
- * }
- */
-// async function fetchRoute(from, to) {
-//     const res = await fetch("/api/route", {
-//         method: "POST",
-//         headers: { "Content-Type": "application/json" },
-//         body: JSON.stringify({ from, to }),
-//     });
-//     if (!res.ok) throw new Error(`Route API error: ${res.status}`);
-//     return res.json();
-// }
+const PATIENT_BUILDING_TYPES = new Set(["clinical", "parking", "admin"]);
 
 // ── Utility ───────────────────────────────────────────────────────────────────
 
-function buildWaypoints(from, to) {
-    // Fallback straight-line waypoints used when the API is unavailable.
-    const f = BUILDING_MAP[from];
-    const t = BUILDING_MAP[to];
-    if (!f || !t) return [];
-    const mid =
-        Math.abs(f.cx - t.cx) > 40 && Math.abs(f.cy - t.cy) > 40
-            ? [{ x: f.cx, y: t.cy }]
-            : [];
-    return [{ x: f.cx, y: f.cy }, ...mid, { x: t.cx, y: t.cy }];
-}
-
 function waypointsToPoints(wps) {
     return wps.map((p) => `${p.x},${p.y}`).join(" ");
-}
-
-function estimateRoute(from, to) {
-    const f = BUILDING_MAP[from];
-    const t = BUILDING_MAP[to];
-    const dist = Math.round(
-        Math.sqrt(Math.pow(f.cx - t.cx, 2) + Math.pow(f.cy - t.cy, 2)) * 1.5
-    );
-    const walkMinutes = Math.max(1, Math.round(dist / 80));
-    const dx = t.cx - f.cx;
-    const dy = t.cy - f.cy;
-    const steps = [];
-    if (Math.abs(dx) > Math.abs(dy)) {
-        steps.push(`Head ${dx > 0 ? "east" : "west"} along the main corridor`);
-        if (Math.abs(dy) > 30)
-            steps.push(`Turn ${dy > 0 ? "south" : "north"} at the next junction`);
-    } else {
-        steps.push(`Head ${dy > 0 ? "south" : "north"} along the path`);
-        if (Math.abs(dx) > 30)
-            steps.push(`Turn ${dx > 0 ? "east" : "west"} at the next junction`);
-    }
-    steps.push(`Arrive at ${t.label}`);
-    return { steps, distanceFt: dist, walkMinutes, waypoints: buildWaypoints(from, to) };
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -180,14 +96,25 @@ function StepItem({ icon, iconClassName, title, subtitle }) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function MapNavigation() {
+    const [buildings, setBuildings] = useState([]);
     const [from, setFrom] = useState("");
     const [to, setTo] = useState("");
     const [routeData, setRouteData] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [loadingBuildings, setLoadingBuildings] = useState(true);
     const [error, setError] = useState(null);
     const [toast, setToast] = useState(null);
     const [zoom, setZoom] = useState(1);
     const toastTimer = useRef(null);
+
+    const buildingMap = useMemo(
+        () => Object.fromEntries(buildings.map((building) => [building.id, building])),
+        [buildings],
+    );
+    const patientBuildings = useMemo(
+        () => buildings.filter((building) => PATIENT_BUILDING_TYPES.has(building.type)),
+        [buildings],
+    );
 
     const showToast = useCallback((msg) => {
         setToast(msg);
@@ -197,7 +124,35 @@ export default function MapNavigation() {
 
     useEffect(() => () => clearTimeout(toastTimer.current), []);
 
+    useEffect(() => {
+        let cancelled = false;
+
+        async function loadBuildings() {
+            setLoadingBuildings(true);
+            setError(null);
+
+            try {
+                const data = await fetchIndoorBuildings();
+                if (cancelled) return;
+                setBuildings(data);
+            } catch (err) {
+                if (cancelled) return;
+                setError(err.message || "Failed to load campus locations.");
+            } finally {
+                if (!cancelled) {
+                    setLoadingBuildings(false);
+                }
+            }
+        }
+
+        loadBuildings();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
     const handleGetDirections = async () => {
+        if (loadingBuildings) { showToast("Loading campus locations"); return; }
         if (!from || !to) { showToast("Pick a start and destination"); return; }
         if (from === to)  { showToast("Start and destination are the same"); return; }
 
@@ -205,22 +160,20 @@ export default function MapNavigation() {
         setError(null);
 
         try {
-            const data = await fetchRoute(from, to);
-            setRouteData({ ...data, from, to });
-            showToast(`Route to ${BUILDING_MAP[to]?.label}`);
+            const data = await fetchIndoorRoute({ from, to });
+            setRouteData(data);
+            showToast(`Route to ${buildingMap[to]?.label || "destination"}`);
         } catch (err) {
-            // Fallback: estimate locally if API is not yet available
-            console.warn("Route API unavailable, using local estimate:", err.message);
-            const fallback = estimateRoute(from, to);
-            setRouteData({ ...fallback, from, to });
-            showToast("Using estimated route (API offline)");
+            setRouteData(null);
+            setError(err.message || "Failed to fetch indoor route.");
+            showToast("Could not fetch route");
         } finally {
             setLoading(false);
         }
     };
 
-    const fromBuilding = BUILDING_MAP[from];
-    const toBuilding   = BUILDING_MAP[to];
+    const fromBuilding = buildingMap[from];
+    const toBuilding   = buildingMap[to];
     const waypoints    = routeData?.waypoints ?? [];
 
     return (
@@ -237,10 +190,11 @@ export default function MapNavigation() {
                             <select
                                 className="select"
                                 value={from}
+                                disabled={loadingBuildings}
                                 onChange={(e) => { setFrom(e.target.value); setRouteData(null); }}
                             >
-                                <option value="">Starting location…</option>
-                                {PATIENT_BUILDINGS.map((b) => (
+                                <option value="">{loadingBuildings ? "Loading locations…" : "Starting location…"}</option>
+                                {patientBuildings.map((b) => (
                                     <option key={b.id} value={b.id}>{b.label}</option>
                                 ))}
                             </select>
@@ -251,10 +205,11 @@ export default function MapNavigation() {
                             <select
                                 className="select"
                                 value={to}
+                                disabled={loadingBuildings}
                                 onChange={(e) => { setTo(e.target.value); setRouteData(null); }}
                             >
                                 <option value="">Destination…</option>
-                                {BUILDINGS.filter((b) => b.type !== "parking").map((b) => (
+                                {buildings.filter((b) => b.type !== "parking").map((b) => (
                                     <option key={b.id} value={b.id}>{b.label}</option>
                                 ))}
                             </select>
@@ -262,7 +217,7 @@ export default function MapNavigation() {
                         <button
                             className={`goBtn${loading ? " goBtnLoading" : ""}`}
                             onClick={handleGetDirections}
-                            disabled={loading}
+                            disabled={loading || loadingBuildings}
                         >
                             {loading ? "Calculating…" : "Get Directions"}
                         </button>
@@ -377,7 +332,7 @@ export default function MapNavigation() {
                     ))}
 
                     {/* Buildings */}
-                    {BUILDINGS.map((b) => (
+                    {buildings.map((b) => (
                         <BuildingRect
                             key={b.id}
                             b={b}

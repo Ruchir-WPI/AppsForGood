@@ -101,7 +101,7 @@ class MapboxService {
         };
     }
 
-    async geocodePlace(query) {
+    async geocodeSuggestions({ query, limit = 5 } = {}) {
         if (typeof this.fetchImpl !== "function") {
             throw new ConfigError("Global fetch is unavailable. Use Node.js 18+ or provide fetchImpl.");
         }
@@ -110,10 +110,14 @@ class MapboxService {
             throw new ValidationError("Geocode query must be a non-empty string.");
         }
 
+        const safeLimit = this.#normalizeSuggestionLimit(limit);
         const accessToken = this.accessToken || getMapboxAccessToken({ required: true });
         const encodedQuery = encodeURIComponent(query.trim());
         const params = new URLSearchParams({
-            limit: "1",
+            autocomplete: "true",
+            country: "us",
+            types: "address,place,poi",
+            limit: String(safeLimit),
             access_token: accessToken,
         });
         const url = `${this.directionsBaseUrl}/geocoding/v5/mapbox.places/${encodedQuery}.json?${params.toString()}`;
@@ -129,15 +133,37 @@ class MapboxService {
             }, 503);
         }
 
+        let payload = null;
+        try {
+            payload = await response.json();
+        } catch (_error) {
+            payload = null;
+        }
+
         if (!response.ok) {
             throw new UpstreamApiError("Mapbox Geocoding returned an error response.", {
                 provider: "mapbox",
                 upstreamStatus: response.status,
+                upstreamCode: payload?.code || null,
+                message: payload?.message || null,
             }, response.status >= 500 ? 503 : 502);
         }
 
-        const payload = await response.json();
-        const feature = payload?.features?.[0];
+        const features = Array.isArray(payload?.features) ? payload.features : [];
+
+        return features
+            .filter((feature) => Array.isArray(feature?.center) && feature.center.length >= 2)
+            .map((feature) => ({
+                id: feature.id,
+                text: feature.text || "",
+                place_name: feature.place_name || feature.text || "",
+                center: [feature.center[0], feature.center[1]],
+            }));
+    }
+
+    async geocodePlace(query) {
+        const suggestions = await this.geocodeSuggestions({ query, limit: 1 });
+        const feature = suggestions[0];
         if (!feature?.center) {
             throw new RouteNotFoundError(`No geocoding result found for "${query}".`, {
                 provider: "mapbox",
@@ -152,6 +178,18 @@ class MapboxService {
                 lat: feature.center[1],
             },
         };
+    }
+
+    #normalizeSuggestionLimit(limit) {
+        if (!Number.isInteger(limit)) {
+            throw new ValidationError("Geocode limit must be an integer.");
+        }
+
+        if (limit < 1 || limit > 10) {
+            throw new ValidationError("Geocode limit must be between 1 and 10.");
+        }
+
+        return limit;
     }
 
     #assertCoordinate(value, fieldName) {

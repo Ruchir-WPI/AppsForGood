@@ -120,3 +120,59 @@ test("MapboxService upstream error throws UPSTREAM_API_ERROR", async () => {
         },
     );
 });
+
+test("MapboxService geocodeSuggestions returns normalized suggestion payload", async () => {
+    process.env.MAPBOX_ACCESS_TOKEN = "test-token";
+    const service = new MapboxService({
+        fetchImpl: async () => ({
+            ok: true,
+            status: 200,
+            async json() {
+                return {
+                    features: [
+                        {
+                            id: "address.1",
+                            text: "55 Lake Ave N",
+                            place_name: "55 Lake Ave N, Worcester, Massachusetts, United States",
+                            center: [-71.7654, 42.2776],
+                        },
+                    ],
+                };
+            },
+        }),
+    });
+
+    const suggestions = await service.geocodeSuggestions({
+        query: "55 Lake Ave",
+        limit: 5,
+    });
+
+    assert.equal(suggestions.length, 1);
+    assert.equal(suggestions[0].id, "address.1");
+    assert.equal(suggestions[0].text, "55 Lake Ave N");
+    assert.equal(suggestions[0].center[0], -71.7654);
+});
+
+test("MapboxService geocodeSuggestions validates integer limit", async () => {
+    process.env.MAPBOX_ACCESS_TOKEN = "test-token";
+    const service = new MapboxService({
+        fetchImpl: async () => ({
+            ok: true,
+            status: 200,
+            async json() {
+                return { features: [] };
+            },
+        }),
+    });
+
+    await assert.rejects(
+        service.geocodeSuggestions({
+            query: "Worcester",
+            limit: 2.5,
+        }),
+        (error) => {
+            assert.equal(error.code, "VALIDATION_ERROR");
+            return true;
+        },
+    );
+});
