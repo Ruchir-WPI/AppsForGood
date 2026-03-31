@@ -165,6 +165,139 @@
     margin-top: 1px;
 }
 
+.arrivalStatus {
+    margin-bottom: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #1f4a86;
+    background: #eef5ff;
+    border: 1px solid #d4e3ff;
+}
+
+.arrivalStatusReady {
+    color: #166534;
+    background: #ebf9ef;
+    border-color: #b8e4c2;
+}
+
+.adminTools {
+    margin-bottom: 10px;
+}
+
+.adminToggleBtn {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background: #fafafa;
+    color: #333;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.adminToggleBtn:hover {
+    background: #f2f2f2;
+}
+
+.adminToolsPanel {
+    margin-top: 8px;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #ececec;
+    background: #fcfcfc;
+}
+
+.adminToolsLabel {
+    font-size: 11px;
+    font-weight: 600;
+    color: #777;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 8px;
+}
+
+.adminPresetRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.adminPresetBtn {
+    padding: 6px 8px;
+    border: 1px solid #d8d8d8;
+    border-radius: 7px;
+    background: #fff;
+    color: #444;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.adminPresetBtn:hover {
+    background: #f6f6f6;
+}
+
+.adminCoordRow {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.adminCoordInput {
+    width: 100%;
+    min-width: 0;
+    padding: 7px 8px;
+    border: 1px solid #dfdfdf;
+    border-radius: 7px;
+    background: #fff;
+    color: #222;
+    font-size: 12px;
+    box-sizing: border-box;
+}
+
+.adminCoordInput:focus {
+    outline: none;
+    border-color: #1a73e8;
+}
+
+.adminActionRow {
+    display: flex;
+    gap: 6px;
+}
+
+.adminApplyBtn,
+.adminResetBtn {
+    flex: 1;
+    padding: 8px;
+    border-radius: 7px;
+    border: none;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.adminApplyBtn {
+    background: #1a73e8;
+    color: #fff;
+}
+
+.adminApplyBtn:hover {
+    background: #1557b0;
+}
+
+.adminResetBtn {
+    background: #eceff6;
+    color: #2a3b58;
+}
+
+.adminResetBtn:hover {
+    background: #dfe5f2;
+}
+
 .directionsBtn {
     width: 100%;
     padding: 10px;

@@ -1,70 +1,105 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import "./MapNavigation.css";
-import { fetchIndoorBuildings, fetchIndoorRoute } from "./utils/navigationApi";
-import { PATIENT_BUILDING_TYPES, TYPE_COLORS } from "./constants/mapNavigation";
+import { fetchIndoorGraphRoute, fetchIndoorMapData } from "./utils/navigationApi";
+import {
+    EDGE_STYLE,
+    FLOOR_BG_COLORS,
+    MAP_PADDING,
+    MAP_SCALE,
+    NODE_TYPE_STYLES,
+} from "./constants/mapNavigation";
 
-function waypointsToPoints(wps) {
-    return wps.map((p) => `${p.x},${p.y}`).join(" ");
+const EMPTY_INDOOR_MAP = {
+    buildings: [],
+    floors: [],
+    rooms: [],
+    nodes: [],
+    edges: [],
+    entrances: [],
+    outdoorPoints: [],
+};
+
+function toProjectedPoint(node) {
+    return {
+        x: node.x * MAP_SCALE,
+        y: node.y * MAP_SCALE,
+    };
 }
 
-function BuildingRect({ b, isStart, isEnd, isHighlighted }) {
-    const colors = TYPE_COLORS[b.type] || TYPE_COLORS.clinical;
-    const w = b.id.startsWith("biotech") || b.id === "benedict" ? 55 : 80;
-    const h = b.id.startsWith("biotech") || b.id === "benedict" ? 38 :
-                                            b.id === "leahy" ? 40 :
-                                            b.id === "plantation-garage" ? 38 : 45;
-    const x = b.cx - w / 2;
-    const y = b.cy - h / 2;
-    const strokeWidth = isStart || isEnd ? 2.5 : isHighlighted ? 2 : 1;
-    const strokeColor = isStart ? "#1a73e8" : isEnd ? "#ea4335" : colors.stroke;
-    const labelLines = b.label.split(" ").reduce((acc, word) => {
-        const last = acc[acc.length - 1];
-        if (last && (last + " " + word).length <= 14) acc[acc.length - 1] = last + " " + word;
-        else acc.push(word);
-        return acc;
-    }, []);
-
-    return (
-        <g>
-            <rect
-                x={x} y={y} width={w} height={h} rx={3}
-                fill={colors.fill} stroke={strokeColor} strokeWidth={strokeWidth}
-            />
-            {labelLines.map((line, i) => (
-                <text
-                    key={i}
-                    x={b.cx}
-                    y={b.cy - ((labelLines.length - 1) * 6) + i * 12}
-                    fontSize={9}
-                    fill={colors.text}
-                    textAnchor="middle"
-                    fontFamily="sans-serif"
-                    fontWeight={i === 0 ? "bold" : "normal"}
-                >
-                    {line}
-                </text>
-            ))}
-        </g>
-    );
+function segmentKey(a, b) {
+    return a < b ? `${a}__${b}` : `${b}__${a}`;
 }
 
-function RouteMarker({ cx, cy, type }) {
-    if (type === "start") {
-        return (
-            <g>
-                <circle cx={cx} cy={cy} r={12} fill="#1a73e8" opacity={0.2} />
-                <circle cx={cx} cy={cy} r={7} fill="#1a73e8" />
-                <circle cx={cx} cy={cy} r={3} fill="white" />
-            </g>
-        );
+function endpointToRequest(endpointValue, entranceMap) {
+    const [kind, id] = endpointValue.split(":");
+    if (kind === "room") {
+        return { roomId: id };
     }
-    return (
-        <g>
-            <circle cx={cx} cy={cy} r={9} fill="#ea4335" />
-            <line x1={cx - 5} y1={cy - 5} x2={cx + 5} y2={cy + 5} stroke="white" strokeWidth={1.5} />
-            <line x1={cx + 5} y1={cy - 5} x2={cx - 5} y2={cy + 5} stroke="white" strokeWidth={1.5} />
-        </g>
-    );
+
+    if (kind === "entrance") {
+        const entrance = entranceMap.get(id);
+        if (!entrance) {
+            return null;
+        }
+
+        return { nodeId: entrance.indoorNodeId };
+    }
+
+    return null;
+}
+
+function endpointLabel(endpointValue, roomMap, entranceMap) {
+    const [kind, id] = endpointValue.split(":");
+    if (kind === "room") {
+        return roomMap.get(id)?.name || id;
+    }
+
+    if (kind === "entrance") {
+        return `${entranceMap.get(id)?.label || id}`;
+    }
+
+    return endpointValue;
+}
+
+function getNodeStyle(type) {
+    return NODE_TYPE_STYLES[type] || NODE_TYPE_STYLES.default;
+}
+
+function computeViewBox(nodes) {
+    if (nodes.length === 0) {
+        return {
+            minX: 0,
+            minY: 0,
+            width: 320,
+            height: 240,
+            value: "0 0 320 240",
+        };
+    }
+
+    let minX = Number.POSITIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+
+    nodes.forEach((node) => {
+        const point = toProjectedPoint(node);
+        minX = Math.min(minX, point.x);
+        minY = Math.min(minY, point.y);
+        maxX = Math.max(maxX, point.x);
+        maxY = Math.max(maxY, point.y);
+    });
+
+    const width = Math.max(140, maxX - minX);
+    const height = Math.max(140, maxY - minY);
+    const value = `${minX - MAP_PADDING} ${minY - MAP_PADDING} ${width + (MAP_PADDING * 2)} ${height + (MAP_PADDING * 2)}`;
+
+    return {
+        minX,
+        minY,
+        width,
+        height,
+        value,
+    };
 }
 
 function StepItem({ icon, iconClassName, title, subtitle }) {
@@ -80,28 +115,21 @@ function StepItem({ icon, iconClassName, title, subtitle }) {
 }
 
 export default function MapNavigation() {
-    const [buildings, setBuildings] = useState([]);
-    const [from, setFrom] = useState("");
-    const [to, setTo] = useState("");
+    const [mapData, setMapData] = useState(null);
+    const [selectedBuildingId, setSelectedBuildingId] = useState("");
+    const [selectedFloorId, setSelectedFloorId] = useState("");
+    const [fromEndpoint, setFromEndpoint] = useState("");
+    const [toEndpoint, setToEndpoint] = useState("");
     const [routeData, setRouteData] = useState(null);
-    const [loading, setLoading] = useState(false);
-    const [loadingBuildings, setLoadingBuildings] = useState(true);
+    const [loadingMap, setLoadingMap] = useState(true);
+    const [loadingRoute, setLoadingRoute] = useState(false);
     const [error, setError] = useState(null);
     const [toast, setToast] = useState(null);
     const [zoom, setZoom] = useState(1);
     const toastTimer = useRef(null);
 
-    const buildingMap = useMemo(
-        () => Object.fromEntries(buildings.map((building) => [building.id, building])),
-        [buildings],
-    );
-    const patientBuildings = useMemo(
-        () => buildings.filter((building) => PATIENT_BUILDING_TYPES.has(building.type)),
-        [buildings],
-    );
-
-    const showToast = useCallback((msg) => {
-        setToast(msg);
+    const showToast = useCallback((message) => {
+        setToast(message);
         clearTimeout(toastTimer.current);
         toastTimer.current = setTimeout(() => setToast(null), 2500);
     }, []);
@@ -111,97 +139,412 @@ export default function MapNavigation() {
     useEffect(() => {
         let cancelled = false;
 
-        async function loadBuildings() {
-            setLoadingBuildings(true);
+        async function loadIndoorMap() {
+            setLoadingMap(true);
             setError(null);
 
             try {
-                const data = await fetchIndoorBuildings();
-                if (cancelled) return;
-                setBuildings(data);
+                const payload = await fetchIndoorMapData();
+                if (cancelled) {
+                    return;
+                }
+
+                setMapData(payload);
+
+                if (payload.buildings.length > 0) {
+                    setSelectedBuildingId(payload.buildings[0].id);
+                }
             } catch (err) {
-                if (cancelled) return;
-                setError(err.message || "Failed to load campus locations.");
+                if (cancelled) {
+                    return;
+                }
+
+                setError(err.message || "Failed to load indoor map data.");
             } finally {
                 if (!cancelled) {
-                    setLoadingBuildings(false);
+                    setLoadingMap(false);
                 }
             }
         }
 
-        loadBuildings();
+        loadIndoorMap();
+
         return () => {
             cancelled = true;
         };
     }, []);
 
-    const handleGetDirections = async () => {
-        if (loadingBuildings) { showToast("Loading campus locations"); return; }
-        if (!from || !to) { showToast("Pick a start and destination"); return; }
-        if (from === to)  { showToast("Start and destination are the same"); return; }
+    const normalizedMapData = mapData || EMPTY_INDOOR_MAP;
+    const { buildings, floors, rooms, nodes, edges, entrances, outdoorPoints } = normalizedMapData;
 
-        setLoading(true);
+    const buildingMap = useMemo(
+        () => new Map(buildings.map((building) => [building.id, building])),
+        [buildings],
+    );
+    const floorMap = useMemo(
+        () => new Map(floors.map((floor) => [floor.id, floor])),
+        [floors],
+    );
+    const roomMap = useMemo(
+        () => new Map(rooms.map((room) => [room.id, room])),
+        [rooms],
+    );
+    const nodeMap = useMemo(
+        () => new Map(nodes.map((node) => [node.id, node])),
+        [nodes],
+    );
+    const entranceMap = useMemo(
+        () => new Map(entrances.map((entrance) => [entrance.id, entrance])),
+        [entrances],
+    );
+
+    const selectedBuilding = buildingMap.get(selectedBuildingId) || null;
+
+    const floorsForBuilding = useMemo(
+        () => floors
+            .filter((floor) => floor.buildingId === selectedBuildingId)
+            .sort((a, b) => a.level - b.level),
+        [floors, selectedBuildingId],
+    );
+    const roomsForBuilding = useMemo(
+        () => rooms.filter((room) => room.buildingId === selectedBuildingId),
+        [rooms, selectedBuildingId],
+    );
+    const buildingNodes = useMemo(
+        () => nodes.filter((node) => node.buildingId === selectedBuildingId),
+        [nodes, selectedBuildingId],
+    );
+    const floorNodes = useMemo(
+        () => buildingNodes.filter((node) => node.floorId === selectedFloorId),
+        [buildingNodes, selectedFloorId],
+    );
+
+    const floorNodeIds = useMemo(
+        () => new Set(floorNodes.map((node) => node.id)),
+        [floorNodes],
+    );
+
+    const floorEdges = useMemo(
+        () => edges.filter((edge) => floorNodeIds.has(edge.fromNodeId) && floorNodeIds.has(edge.toNodeId)),
+        [edges, floorNodeIds],
+    );
+
+    const entrancesForBuilding = useMemo(
+        () => entrances
+            .filter((entrance) => entrance.buildingId === selectedBuildingId)
+            .map((entrance) => ({
+                entrance,
+                node: nodeMap.get(entrance.indoorNodeId) || null,
+            }))
+            .filter((entry) => Boolean(entry.node)),
+        [entrances, selectedBuildingId, nodeMap],
+    );
+
+    const floorEntrances = useMemo(
+        () => entrancesForBuilding.filter((entry) => entry.node.floorId === selectedFloorId),
+        [entrancesForBuilding, selectedFloorId],
+    );
+
+    const entranceOptions = useMemo(
+        () => entrancesForBuilding.map(({ entrance, node }) => ({
+            value: `entrance:${entrance.id}`,
+            label: `${entrance.label} (${floorMap.get(node.floorId)?.name || node.floorId})`,
+        })),
+        [entrancesForBuilding, floorMap],
+    );
+
+    const roomOptions = useMemo(
+        () => roomsForBuilding.map((room) => ({
+            value: `room:${room.id}`,
+            label: `${room.name} (${floorMap.get(room.floorId)?.name || room.floorId})`,
+        })),
+        [roomsForBuilding, floorMap],
+    );
+
+    const endpointValues = useMemo(
+        () => new Set([...entranceOptions, ...roomOptions].map((option) => option.value)),
+        [entranceOptions, roomOptions],
+    );
+
+    const projectedNodeMap = useMemo(() => {
+        const projected = new Map();
+        buildingNodes.forEach((node) => {
+            projected.set(node.id, toProjectedPoint(node));
+        });
+        return projected;
+    }, [buildingNodes]);
+
+    const viewBox = useMemo(
+        () => computeViewBox(buildingNodes),
+        [buildingNodes],
+    );
+
+    const floorIndex = useMemo(
+        () => floorsForBuilding.findIndex((floor) => floor.id === selectedFloorId),
+        [floorsForBuilding, selectedFloorId],
+    );
+
+    const routeSegmentKeys = useMemo(() => {
+        const keys = new Set();
+        const path = routeData?.nodePath;
+        if (!Array.isArray(path)) {
+            return keys;
+        }
+
+        for (let i = 0; i < path.length - 1; i += 1) {
+            keys.add(segmentKey(path[i], path[i + 1]));
+        }
+
+        return keys;
+    }, [routeData]);
+
+    const routeNodeIds = useMemo(() => {
+        const ids = new Set();
+        if (!Array.isArray(routeData?.nodePath)) {
+            return ids;
+        }
+
+        routeData.nodePath.forEach((nodeId) => ids.add(nodeId));
+        return ids;
+    }, [routeData]);
+
+    const floorRouteNodeIds = useMemo(() => {
+        if (!Array.isArray(routeData?.nodePath)) {
+            return [];
+        }
+
+        return routeData.nodePath.filter((nodeId) => floorNodeIds.has(nodeId));
+    }, [routeData, floorNodeIds]);
+
+    const routePolyline = useMemo(
+        () => floorRouteNodeIds
+            .map((nodeId) => {
+                const point = projectedNodeMap.get(nodeId);
+                return point ? `${point.x},${point.y}` : null;
+            })
+            .filter(Boolean)
+            .join(" "),
+        [floorRouteNodeIds, projectedNodeMap],
+    );
+
+    const routeFloors = useMemo(() => {
+        if (!Array.isArray(routeData?.nodePath)) {
+            return [];
+        }
+
+        const seen = new Set();
+        return routeData.nodePath
+            .map((nodeId) => nodeMap.get(nodeId)?.floorId)
+            .filter((floorId) => {
+                if (!floorId || seen.has(floorId)) {
+                    return false;
+                }
+                seen.add(floorId);
+                return true;
+            })
+            .map((floorId) => floorMap.get(floorId)?.name || floorId);
+    }, [routeData, nodeMap, floorMap]);
+
+    useEffect(() => {
+        if (floorsForBuilding.length === 0) {
+            setSelectedFloorId("");
+            return;
+        }
+
+        const hasSelectedFloor = floorsForBuilding.some((floor) => floor.id === selectedFloorId);
+        if (!hasSelectedFloor) {
+            setSelectedFloorId(floorsForBuilding[0].id);
+        }
+    }, [floorsForBuilding, selectedFloorId]);
+
+    useEffect(() => {
+        setRouteData(null);
+        setError(null);
+    }, [selectedBuildingId]);
+
+    useEffect(() => {
+        if (endpointValues.size === 0) {
+            setFromEndpoint("");
+            setToEndpoint("");
+            return;
+        }
+
+        const defaultFrom = entranceOptions[0]?.value || roomOptions[0]?.value || "";
+        const safeFrom = endpointValues.has(fromEndpoint) ? fromEndpoint : defaultFrom;
+        if (safeFrom !== fromEndpoint) {
+            setFromEndpoint(safeFrom);
+        }
+
+        const fallbackTo =
+            roomOptions.find((option) => option.value !== safeFrom)?.value
+            || entranceOptions.find((option) => option.value !== safeFrom)?.value
+            || "";
+        const safeTo = endpointValues.has(toEndpoint) && toEndpoint !== safeFrom ? toEndpoint : fallbackTo;
+        if (safeTo !== toEndpoint) {
+            setToEndpoint(safeTo);
+        }
+    }, [endpointValues, fromEndpoint, toEndpoint, entranceOptions, roomOptions]);
+
+    const handleGetDirections = async () => {
+        if (loadingMap) {
+            showToast("Loading indoor data");
+            return;
+        }
+
+        if (!fromEndpoint || !toEndpoint) {
+            showToast("Pick start and destination");
+            return;
+        }
+
+        if (fromEndpoint === toEndpoint) {
+            showToast("Start and destination are the same");
+            return;
+        }
+
+        const start = endpointToRequest(fromEndpoint, entranceMap);
+        const destination = endpointToRequest(toEndpoint, entranceMap);
+
+        if (!start || !destination) {
+            setError("Invalid start or destination selection.");
+            return;
+        }
+
+        setLoadingRoute(true);
         setError(null);
 
         try {
-            const data = await fetchIndoorRoute({ from, to });
-            setRouteData(data);
-            showToast(`Route to ${buildingMap[to]?.label || "destination"}`);
+            const route = await fetchIndoorGraphRoute({
+                start,
+                destination,
+                buildingId: selectedBuildingId,
+            });
+
+            setRouteData(route);
+
+            const startNode = nodeMap.get(route.selectedStartNodeId);
+            if (startNode?.floorId) {
+                setSelectedFloorId(startNode.floorId);
+            }
+
+            showToast("Indoor route generated");
         } catch (err) {
             setRouteData(null);
-            setError(err.message || "Failed to fetch indoor route.");
-            showToast("Could not fetch route");
+            setError(err.message || "Failed to compute indoor route.");
+            showToast("Could not compute route");
         } finally {
-            setLoading(false);
+            setLoadingRoute(false);
         }
     };
 
-    const fromBuilding = buildingMap[from];
-    const toBuilding   = buildingMap[to];
-    const waypoints    = routeData?.waypoints ?? [];
+    const selectedFloor = floorMap.get(selectedFloorId) || null;
+    const routeStartPoint = routeData ? projectedNodeMap.get(routeData.selectedStartNodeId) : null;
+    const routeEndPoint = routeData ? projectedNodeMap.get(routeData.selectedDestinationNodeId) : null;
 
     return (
         <div className="wrapper">
             <div className="sidebar">
                 <div className="sidebarHeader">
-                    <div className="logo">UMass Chan Navigation</div>
+                    <div className="logo">UMass Memorial Indoor Navigation</div>
 
                     <div className="routePanel">
+                        <div className="controlBlock">
+                            <label className="controlLabel" htmlFor="building-select">Building</label>
+                            <select
+                                id="building-select"
+                                className="select"
+                                value={selectedBuildingId}
+                                disabled={loadingMap}
+                                onChange={(event) => {
+                                    setSelectedBuildingId(event.target.value);
+                                    setFromEndpoint("");
+                                    setToEndpoint("");
+                                }}
+                            >
+                                {buildings.map((building) => (
+                                    <option key={building.id} value={building.id}>{building.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="floorTabs">
+                            {floorsForBuilding.map((floor) => (
+                                <button
+                                    key={floor.id}
+                                    type="button"
+                                    className={`floorTab${floor.id === selectedFloorId ? " floorTabActive" : ""}`}
+                                    onClick={() => setSelectedFloorId(floor.id)}
+                                >
+                                    {floor.name}
+                                </button>
+                            ))}
+                        </div>
+
                         <div className="routeRow">
                             <div className="routeDot routeDotStart" />
                             <select
                                 className="select"
-                                value={from}
-                                disabled={loadingBuildings}
-                                onChange={(e) => { setFrom(e.target.value); setRouteData(null); }}
+                                value={fromEndpoint}
+                                disabled={loadingMap}
+                                onChange={(event) => {
+                                    setFromEndpoint(event.target.value);
+                                    setRouteData(null);
+                                }}
                             >
-                                <option value="">{loadingBuildings ? "Loading locations…" : "Starting location…"}</option>
-                                {patientBuildings.map((b) => (
-                                    <option key={b.id} value={b.id}>{b.label}</option>
-                                ))}
+                                <option value="">Start point...</option>
+                                {entranceOptions.length > 0 && (
+                                    <optgroup label="Entrances">
+                                        {entranceOptions.map((option) => (
+                                            <option key={option.value} value={option.value}>{option.label}</option>
+                                        ))}
+                                    </optgroup>
+                                )}
+                                {roomOptions.length > 0 && (
+                                    <optgroup label="Rooms">
+                                        {roomOptions.map((option) => (
+                                            <option key={option.value} value={option.value}>{option.label}</option>
+                                        ))}
+                                    </optgroup>
+                                )}
                             </select>
                         </div>
+
                         <div className="routeLine" />
+
                         <div className="routeRow">
                             <div className="routeDot routeDotEnd" />
                             <select
                                 className="select"
-                                value={to}
-                                disabled={loadingBuildings}
-                                onChange={(e) => { setTo(e.target.value); setRouteData(null); }}
+                                value={toEndpoint}
+                                disabled={loadingMap}
+                                onChange={(event) => {
+                                    setToEndpoint(event.target.value);
+                                    setRouteData(null);
+                                }}
                             >
-                                <option value="">Destination…</option>
-                                {buildings.filter((b) => b.type !== "parking").map((b) => (
-                                    <option key={b.id} value={b.id}>{b.label}</option>
-                                ))}
+                                <option value="">Destination...</option>
+                                {entranceOptions.length > 0 && (
+                                    <optgroup label="Entrances">
+                                        {entranceOptions.map((option) => (
+                                            <option key={option.value} value={option.value}>{option.label}</option>
+                                        ))}
+                                    </optgroup>
+                                )}
+                                {roomOptions.length > 0 && (
+                                    <optgroup label="Rooms">
+                                        {roomOptions.map((option) => (
+                                            <option key={option.value} value={option.value}>{option.label}</option>
+                                        ))}
+                                    </optgroup>
+                                )}
                             </select>
                         </div>
+
                         <button
-                            className={`goBtn${loading ? " goBtnLoading" : ""}`}
+                            className={`goBtn${loadingRoute ? " goBtnLoading" : ""}`}
                             onClick={handleGetDirections}
-                            disabled={loading || loadingBuildings}
+                            disabled={loadingRoute || loadingMap}
                         >
-                            {loading ? "Calculating…" : "Get Directions"}
+                            {loadingRoute ? "Routing..." : "Generate Indoor Route"}
                         </button>
                     </div>
                 </div>
@@ -210,146 +553,242 @@ export default function MapNavigation() {
                     <div className="routeInfo">
                         <div className="routeMeta">
                             <div className="routeStat">
-                                <strong className="routeStatNum">{routeData.walkMinutes} min</strong>
-                                walk
-                            </div>
-                            <div className="routeStat">
-                                <strong className="routeStatNum">{routeData.distanceFt} ft</strong>
-                                distance
+                                <strong className="routeStatNum">{routeData.totalDistance}</strong>
+                                distance units
                             </div>
                             <div className="routeStat">
                                 <strong className="routeStatNum">{routeData.steps.length}</strong>
-                                steps
+                                instructions
+                            </div>
+                            <div className="routeStat">
+                                <strong className="routeStatNum">{routeData.meta?.visitedNodeCount ?? 0}</strong>
+                                nodes visited
                             </div>
                         </div>
+                        {routeFloors.length > 0 && (
+                            <div className="routeFloors">Route floors: {routeFloors.join(" -> ")}</div>
+                        )}
                     </div>
                 )}
 
-                {error && (
-                    <div className="errorBanner">{error}</div>
-                )}
+                {error && <div className="errorBanner">{error}</div>}
 
                 <div className="stepsList">
                     {!routeData ? (
                         <StepItem
                             icon="i"
                             iconClassName="iconInfo"
-                            title="Select a start and destination"
-                            subtitle="Directions will appear here"
+                            title="Select indoor start and destination"
+                            subtitle="Routes are generated from sampleCampus graph data"
                         />
                     ) : (
                         <>
                             <StepItem
                                 icon="A"
                                 iconClassName="iconNav"
-                                title={fromBuilding?.label}
-                                subtitle="Starting point"
+                                title={endpointLabel(fromEndpoint, roomMap, entranceMap)}
+                                subtitle="Start"
                             />
-                            {routeData.steps.map((step, i) => (
+                            {routeData.steps.map((step, index) => (
                                 <StepItem
-                                    key={i}
-                                    icon={i + 1}
+                                    key={step.edgeId}
+                                    icon={index + 1}
                                     iconClassName="iconNav"
-                                    title={step}
+                                    title={step.instruction}
+                                    subtitle={`${step.distance} units on ${floorMap.get(step.toFloorId)?.name || step.toFloorId}`}
                                 />
                             ))}
                             <StepItem
                                 icon="B"
                                 iconClassName="iconDest"
-                                title={toBuilding?.label}
-                                subtitle="Destination — arrived"
+                                title={endpointLabel(toEndpoint, roomMap, entranceMap)}
+                                subtitle="Destination"
                             />
                         </>
                     )}
+
+                    <div className="metaSection">
+                        <div className="metaTitle">Entrances</div>
+                        {entrancesForBuilding.map(({ entrance, node }) => (
+                            <div key={entrance.id} className="metaLine">
+                                <span>{entrance.label}</span>
+                                <span>{floorMap.get(node.floorId)?.name || node.floorId}</span>
+                            </div>
+                        ))}
+
+                        <div className="metaTitle">Outdoor Points</div>
+                        {outdoorPoints.map((point) => (
+                            <div key={point.id} className="metaLine">
+                                <span>{point.label}</span>
+                                <span>{point.type}</span>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
 
             <div className="mapArea">
-                <div className="mapLabel">UMass Chan Medical School — Worcester, MA</div>
+                <div className="mapLabel">
+                    {selectedBuilding?.name || "Indoor Map"}
+                    {selectedFloor ? ` - ${selectedFloor.name}` : ""}
+                </div>
 
                 <svg
-                    viewBox="0 0 700 580"
+                    viewBox={viewBox.value}
                     xmlns="http://www.w3.org/2000/svg"
                     className="mapSvg"
                     style={{ transform: `scale(${zoom})`, transformOrigin: "center center" }}
                 >
-                    <defs>
-                        <marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-                            <path d="M0,0 L0,6 L6,3 z" fill="#1a73e8" />
-                        </marker>
-                    </defs>
+                    <rect
+                        x={viewBox.minX - MAP_PADDING}
+                        y={viewBox.minY - MAP_PADDING}
+                        width={viewBox.width + (MAP_PADDING * 2)}
+                        height={viewBox.height + (MAP_PADDING * 2)}
+                        fill={FLOOR_BG_COLORS[Math.max(0, floorIndex) % FLOOR_BG_COLORS.length]}
+                        stroke="#d8e1eb"
+                        strokeWidth={1.2}
+                        rx={10}
+                    />
 
-                    <rect x={0} y={0} width={700} height={580} fill="#e8ead3" />
+                    {floorEdges.map((edge) => {
+                        const fromNode = projectedNodeMap.get(edge.fromNodeId);
+                        const toNode = projectedNodeMap.get(edge.toNodeId);
+                        if (!fromNode || !toNode) {
+                            return null;
+                        }
 
-                    <line x1={0} y1={520} x2={700} y2={520} stroke="#c9c9a0" strokeWidth={14} />
-                    <text x={10} y={516} fontSize={9} fill="#888" fontFamily="sans-serif">Plantation Street</text>
-                    <line x1={0} y1={480} x2={700} y2={480} stroke="#d4d6ba" strokeWidth={8} />
-                    <text x={10} y={476} fontSize={9} fill="#999" fontFamily="sans-serif">South Road</text>
-                    <line x1={80} y1={0} x2={80} y2={580} stroke="#d4d6ba" strokeWidth={6} />
-                    <line x1={600} y1={0} x2={600} y2={580} stroke="#c9c9a0" strokeWidth={10} />
-                    <text x={605} y={30} fontSize={9} fill="#888" fontFamily="sans-serif">Lake Ave N</text>
-                    <line x1={200} y1={200} x2={200} y2={480} stroke="#dddfc5" strokeWidth={5} />
-                    <line x1={350} y1={100} x2={350} y2={480} stroke="#dddfc5" strokeWidth={5} />
-                    <line x1={100} y1={300} x2={580} y2={300} stroke="#dddfc5" strokeWidth={5} />
-                    <text x={102} y={296} fontSize={8} fill="#aaa" fontFamily="sans-serif">North Road</text>
-                    <line x1={100} y1={380} x2={580} y2={380} stroke="#dddfc5" strokeWidth={4} />
-                    <text x={102} y={376} fontSize={8} fill="#aaa" fontFamily="sans-serif">Second Road</text>
-                    <line x1={100} y1={180} x2={580} y2={180} stroke="#dddfc5" strokeWidth={4} />
-                    <text x={102} y={176} fontSize={8} fill="#aaa" fontFamily="sans-serif">Innovation Drive</text>
+                        const isRouteEdge = routeSegmentKeys.has(segmentKey(edge.fromNodeId, edge.toNodeId));
+                        const stroke = isRouteEdge
+                            ? EDGE_STYLE.route
+                            : edge.accessibility?.stairsOnly
+                                ? EDGE_STYLE.stairs
+                                : edge.accessibility?.wheelchair
+                                    ? EDGE_STYLE.elevator
+                                    : EDGE_STYLE.base;
 
-                    {[
-                        [220, 310, "Quad 1"], [310, 310, "Quad 2"],
-                        [220, 220, "Quad 3"], [310, 220, "Quad 4"],
-                    ].map(([x, y, label]) => (
-                        <g key={label}>
-                            <rect x={x} y={y} width={60} height={50} rx={4} fill="#c8d9a0" opacity={0.7} />
-                            <text x={x + 30} y={y + 28} fontSize={8} fill="#5a7a30" textAnchor="middle" fontFamily="sans-serif">{label}</text>
-                        </g>
-                    ))}
+                        return (
+                            <line
+                                key={edge.id}
+                                x1={fromNode.x}
+                                y1={fromNode.y}
+                                x2={toNode.x}
+                                y2={toNode.y}
+                                stroke={stroke}
+                                strokeWidth={isRouteEdge ? 4.8 : 3}
+                                strokeLinecap="round"
+                                opacity={isRouteEdge ? 0.95 : 0.8}
+                            />
+                        );
+                    })}
 
-                    {buildings.map((b) => (
-                        <BuildingRect
-                            key={b.id}
-                            b={b}
-                            isStart={routeData?.from === b.id}
-                            isEnd={routeData?.to === b.id}
-                            isHighlighted={false}
-                        />
-                    ))}
-
-                    {waypoints.length > 1 && (
+                    {routePolyline && (
                         <polyline
-                            points={waypointsToPoints(waypoints)}
+                            points={routePolyline}
                             fill="none"
-                            stroke="#1a73e8"
-                            strokeWidth={4}
+                            stroke={EDGE_STYLE.route}
+                            strokeWidth={5.2}
                             strokeLinecap="round"
                             strokeLinejoin="round"
-                            strokeDasharray="8,4"
-                            markerEnd="url(#arrow)"
-                            opacity={0.85}
+                            strokeDasharray="8 5"
+                            opacity={0.9}
                         />
                     )}
 
-                    {routeData && fromBuilding && (
-                        <RouteMarker cx={fromBuilding.cx} cy={fromBuilding.cy} type="start" />
-                    )}
-                    {routeData && toBuilding && (
-                        <RouteMarker cx={toBuilding.cx} cy={toBuilding.cy} type="end" />
-                    )}
+                    {floorNodes.map((node) => {
+                        const point = projectedNodeMap.get(node.id);
+                        if (!point) {
+                            return null;
+                        }
 
-                    <g transform="translate(655,50)">
-                        <circle cx={0} cy={0} r={16} fill="white" stroke="#ccc" strokeWidth={0.5} />
-                        <text x={0} y={-4} fontSize={10} fill="#d32" textAnchor="middle" fontFamily="sans-serif" fontWeight="bold">N</text>
-                        <path d="M0,-13 L3,-3 L0,-6 L-3,-3 Z" fill="#d32" />
-                        <path d="M0,13 L3,3 L0,6 L-3,3 Z" fill="#bbb" />
-                    </g>
+                        const style = getNodeStyle(node.type);
+                        const onRoute = routeNodeIds.has(node.id);
+
+                        return (
+                            <g key={node.id}>
+                                <circle
+                                    cx={point.x}
+                                    cy={point.y}
+                                    r={onRoute ? style.radius + 1.3 : style.radius}
+                                    fill={style.fill}
+                                    stroke={style.stroke}
+                                    strokeWidth={onRoute ? 2.2 : 1.6}
+                                />
+
+                                {(node.type === "room_entrance" || node.type === "exit" || node.type === "stairs" || node.type === "elevator") && (
+                                    <text
+                                        x={point.x + 5}
+                                        y={point.y - 7}
+                                        fontSize="5"
+                                        fill="#1e293b"
+                                        fontFamily="sans-serif"
+                                        fontWeight="600"
+                                    >
+                                        {node.label}
+                                    </text>
+                                )}
+                            </g>
+                        );
+                    })}
+
+                    {floorEntrances.map(({ entrance, node }) => {
+                        const point = projectedNodeMap.get(node.id);
+                        if (!point) {
+                            return null;
+                        }
+
+                        return (
+                            <g key={entrance.id}>
+                                <rect
+                                    x={point.x - 6.5}
+                                    y={point.y - 6.5}
+                                    width={13}
+                                    height={13}
+                                    transform={`rotate(45 ${point.x} ${point.y})`}
+                                    fill="#ffffff"
+                                    stroke="#00a26d"
+                                    strokeWidth={1.5}
+                                />
+                                <text
+                                    x={point.x + 10}
+                                    y={point.y + 14}
+                                    fontSize="5"
+                                    fill="#065f46"
+                                    fontFamily="sans-serif"
+                                    fontWeight="700"
+                                >
+                                    {entrance.label}
+                                </text>
+                            </g>
+                        );
+                    })}
+
+                    {routeStartPoint && (
+                        <circle cx={routeStartPoint.x} cy={routeStartPoint.y} r={8} fill="#1a73e8" opacity={0.25} />
+                    )}
+                    {routeEndPoint && (
+                        <circle cx={routeEndPoint.x} cy={routeEndPoint.y} r={8} fill="#ea4335" opacity={0.25} />
+                    )}
                 </svg>
 
+                <div className="legendBox">
+                    {Object.entries(NODE_TYPE_STYLES)
+                        .filter(([type]) => type !== "default")
+                        .map(([type, style]) => (
+                            <div key={type} className="legendRow">
+                                <span className="legendSwatch" style={{ background: style.fill, borderColor: style.stroke }} />
+                                <span>{style.legend}</span>
+                            </div>
+                        ))}
+                </div>
+
+                {!loadingMap && floorNodes.length === 0 && (
+                    <div className="emptyState">No indoor nodes were found for this floor.</div>
+                )}
+
                 <div className="mapControls">
-                    <button className="mapBtn" onClick={() => setZoom((z) => Math.min(z + 0.15, 2.5))}>+</button>
-                    <button className="mapBtn" onClick={() => setZoom((z) => Math.max(z - 0.15, 0.5))}>−</button>
-                    <button className="mapBtn" onClick={() => setZoom(1)} title="Reset zoom">⊙</button>
+                    <button className="mapBtn" onClick={() => setZoom((value) => Math.min(value + 0.15, 3))}>+</button>
+                    <button className="mapBtn" onClick={() => setZoom((value) => Math.max(value - 0.15, 0.55))}>-</button>
+                    <button className="mapBtn" onClick={() => setZoom(1)} title="Reset zoom">o</button>
                 </div>
 
                 {toast && <div className="toast">{toast}</div>}

@@ -79,6 +79,26 @@ test("GET /api/campus/buildings returns backend building metadata", async () => 
     });
 });
 
+test("GET /api/campus/indoor-map returns sample campus indoor graph payload", async () => {
+    const app = createApp({ mapboxService: createMockMapboxService() });
+
+    await withServer(app, async (baseUrl) => {
+        const response = await fetch(`${baseUrl}/api/campus/indoor-map`);
+        assert.equal(response.status, 200);
+
+        const payload = await response.json();
+        assert.ok(payload.map);
+        assert.ok(Array.isArray(payload.map.buildings));
+        assert.ok(Array.isArray(payload.map.floors));
+        assert.ok(Array.isArray(payload.map.rooms));
+        assert.ok(Array.isArray(payload.map.nodes));
+        assert.ok(Array.isArray(payload.map.edges));
+        assert.ok(Array.isArray(payload.map.entrances));
+        assert.ok(Array.isArray(payload.map.outdoorPoints));
+        assert.ok(payload.map.entrances.length > 0);
+    });
+});
+
 test("POST /api/route/indoor-ui returns UI contract", async () => {
     const app = createApp({ mapboxService: createMockMapboxService() });
 

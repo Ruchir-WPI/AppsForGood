@@ -1,9 +1,21 @@
-export const TYPE_COLORS = {
-    clinical: { fill: "#b8c0e0", stroke: "#8890c0", text: "#2a3060" },
-    research: { fill: "#d0c8e8", stroke: "#9088c0", text: "#3a2860" },
-    parking: { fill: "#ccc8b0", stroke: "#a0a080", text: "#555544" },
-    admin: { fill: "#c8d8b8", stroke: "#88a880", text: "#2a4020" },
-    academic: { fill: "#b8c8e0", stroke: "#7090c0", text: "#1a3060" },
+export const MAP_SCALE = 28;
+export const MAP_PADDING = 20;
+
+export const FLOOR_BG_COLORS = ["#f7fbff", "#f7fff8", "#fffaf2", "#fff5f9"];
+
+export const EDGE_STYLE = {
+    base: "#bfcbda",
+    route: "#1a73e8",
+    stairs: "#8e24aa",
+    elevator: "#ef6c00",
 };
 
-export const PATIENT_BUILDING_TYPES = new Set(["clinical", "parking", "admin"]);
+export const NODE_TYPE_STYLES = {
+    exit: { fill: "#00a26d", stroke: "#047857", radius: 6, legend: "Entrance / Exit" },
+    hallway: { fill: "#8fa2b9", stroke: "#4b5f75", radius: 4.5, legend: "Hallway" },
+    room_entrance: { fill: "#3f51b5", stroke: "#283593", radius: 5.5, legend: "Room Entrance" },
+    intersection: { fill: "#607d8b", stroke: "#32424a", radius: 4.5, legend: "Intersection" },
+    stairs: { fill: "#8e24aa", stroke: "#5e1580", radius: 5.5, legend: "Stairs" },
+    elevator: { fill: "#ef6c00", stroke: "#b34d00", radius: 5.5, legend: "Elevator" },
+    default: { fill: "#607d8b", stroke: "#32424a", radius: 4.5, legend: "Node" },
+};

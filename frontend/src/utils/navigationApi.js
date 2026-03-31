@@ -48,10 +48,37 @@ export async function fetchIndoorBuildings() {
     return Array.isArray(payload?.buildings) ? payload.buildings : [];
 }
 
+export async function fetchIndoorMapData() {
+    const payload = await requestJson("/campus/indoor-map", { method: "GET" });
+    const map = payload?.map;
+
+    return {
+        buildings: Array.isArray(map?.buildings) ? map.buildings : [],
+        floors: Array.isArray(map?.floors) ? map.floors : [],
+        rooms: Array.isArray(map?.rooms) ? map.rooms : [],
+        nodes: Array.isArray(map?.nodes) ? map.nodes : [],
+        edges: Array.isArray(map?.edges) ? map.edges : [],
+        entrances: Array.isArray(map?.entrances) ? map.entrances : [],
+        outdoorPoints: Array.isArray(map?.outdoorPoints) ? map.outdoorPoints : [],
+    };
+}
+
 export async function fetchIndoorRoute({ from, to }) {
     return requestJson("/route/indoor-ui", {
         method: "POST",
         body: JSON.stringify({ from, to }),
+    });
+}
+
+export async function fetchIndoorGraphRoute({ start, destination, buildingId = null, options = {} }) {
+    return requestJson("/route", {
+        method: "POST",
+        body: JSON.stringify({
+            start,
+            destination,
+            buildingId,
+            options,
+        }),
     });
 }
 

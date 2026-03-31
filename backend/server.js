@@ -36,6 +36,30 @@ function parseCoordinatePoint(value, fieldName) {
   return { lng, lat };
 }
 
+function createIndoorMapPayload(campusData) {
+  return {
+    buildings: campusData.buildings.map((building) => ({ ...building })),
+    floors: campusData.floors.map((floor) => ({ ...floor })),
+    rooms: campusData.rooms.map((room) => ({
+      ...room,
+      nodeIds: Array.isArray(room.nodeIds) ? [...room.nodeIds] : [],
+    })),
+    nodes: campusData.nodes.map((node) => ({ ...node })),
+    edges: campusData.edges.map((edge) => ({
+      ...edge,
+      accessibility: edge.accessibility ? { ...edge.accessibility } : undefined,
+    })),
+    entrances: campusData.entrances.map((entrance) => ({
+      ...entrance,
+      outdoor: entrance.outdoor ? { ...entrance.outdoor } : null,
+    })),
+    outdoorPoints: campusData.outdoorPoints.map((point) => ({
+      ...point,
+      location: point.location ? { ...point.location } : null,
+    })),
+  };
+}
+
 function createApp({ routeService = null, mapboxService = null, indoorUiRouteService = null } = {}) {
   const app = express();
   const resolvedMapboxService = mapboxService || new MapboxService();
@@ -134,6 +158,12 @@ function createApp({ routeService = null, mapboxService = null, indoorUiRouteSer
   app.get("/api/campus/buildings", (_req, res) => {
     res.json({
       buildings: resolvedIndoorUiRouteService.listBuildings(),
+    });
+  });
+
+  app.get("/api/campus/indoor-map", (_req, res) => {
+    res.json({
+      map: createIndoorMapPayload(sampleCampus),
     });
   });
 

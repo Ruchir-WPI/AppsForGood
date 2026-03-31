@@ -1,9 +1,13 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "./OutdoorMap.css";
 import { fetchGeocodeSuggestions, fetchOutdoorRoute } from "./utils/navigationApi";
-import { ARRIVAL_ZOOM_THRESHOLD, UMASS_MEMORIAL } from "./constants/outdoorMap";
+import {
+    ARRIVAL_PROMPT_DISTANCE_METERS,
+    TEST_LOCATION_PRESETS,
+    UMASS_MEMORIAL,
+} from "./constants/outdoorMap";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -18,6 +22,31 @@ function formatDuration(seconds) {
     if (seconds < 60) return `${Math.round(seconds)} sec`;
     const mins = Math.round(seconds / 60);
     return mins < 60 ? `${mins} min` : `${Math.floor(mins / 60)}h ${mins % 60}m`;
+}
+
+function isValidCoordinatePair(lng, lat) {
+    return Number.isFinite(lng)
+        && Number.isFinite(lat)
+        && lng >= -180
+        && lng <= 180
+        && lat >= -90
+        && lat <= 90;
+}
+
+function distanceBetweenMeters(from, to) {
+    const toRadians = (degrees) => (degrees * Math.PI) / 180;
+    const earthRadiusMeters = 6371000;
+
+    const deltaLat = toRadians(to.lat - from.lat);
+    const deltaLng = toRadians(to.lng - from.lng);
+    const fromLatRad = toRadians(from.lat);
+    const toLatRad = toRadians(to.lat);
+
+    const a = Math.sin(deltaLat / 2) ** 2
+        + Math.cos(fromLatRad) * Math.cos(toLatRad) * Math.sin(deltaLng / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return earthRadiusMeters * c;
 }
 
 export default function OutdoorMap({ onEnterBuilding }) {
@@ -37,7 +66,23 @@ export default function OutdoorMap({ onEnterBuilding }) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [geoStatus, setGeoStatus] = useState("idle");
-    const [showEnterBuilding, setShowEnterBuilding] = useState(false);
+    const [showAdminTools, setShowAdminTools] = useState(false);
+    const [adminLngInput, setAdminLngInput] = useState(String(UMASS_MEMORIAL.lng));
+    const [adminLatInput, setAdminLatInput] = useState(String(UMASS_MEMORIAL.lat));
+
+    const distanceToDestinationMeters = useMemo(() => {
+        if (!userLocation) {
+            return null;
+        }
+
+        return distanceBetweenMeters(
+            { lng: userLocation[0], lat: userLocation[1] },
+            { lng: UMASS_MEMORIAL.lng, lat: UMASS_MEMORIAL.lat }
+        );
+    }, [userLocation]);
+
+    const canEnterBuilding = typeof distanceToDestinationMeters === "number"
+        && distanceToDestinationMeters <= ARRIVAL_PROMPT_DISTANCE_METERS;
 
     useEffect(() => {
         if (mapRef.current) return;
@@ -64,10 +109,6 @@ export default function OutdoorMap({ onEnterBuilding }) {
                     )
                 )
                 .addTo(map);
-        });
-
-        map.on("zoomend", () => {
-            setShowEnterBuilding(map.getZoom() >= ARRIVAL_ZOOM_THRESHOLD);
         });
 
         mapRef.current = map;
@@ -128,6 +169,16 @@ export default function OutdoorMap({ onEnterBuilding }) {
         }
     }, []);
 
+    const setCurrentLocation = useCallback((coords, label, status = "found") => {
+        setUserLocation(coords);
+        setAddressInput(label);
+        setSuggestions([]);
+        setShowSuggestions(false);
+        setGeoStatus(status);
+        setError(null);
+        placeUserMarker(coords);
+    }, [placeUserMarker]);
+
     const locateUser = useCallback(() => {
         if (!navigator.geolocation) {
             setError("Geolocation is not supported by your browser.");
@@ -139,11 +190,7 @@ export default function OutdoorMap({ onEnterBuilding }) {
         navigator.geolocation.getCurrentPosition(
             (pos) => {
                 const coords = [pos.coords.longitude, pos.coords.latitude];
-                setUserLocation(coords);
-                setGeoStatus("found");
-                setAddressInput("My current location");
-                setSuggestions([]);
-                placeUserMarker(coords);
+                setCurrentLocation(coords, "My current location", "found");
             },
             (err) => {
                 setGeoStatus("denied");
@@ -152,7 +199,7 @@ export default function OutdoorMap({ onEnterBuilding }) {
             },
             { enableHighAccuracy: true, timeout: 10000 }
         );
-    }, [placeUserMarker]);
+    }, [setCurrentLocation]);
 
     const handleAddressChange = useCallback(async (value) => {
         setAddressInput(value);
@@ -173,12 +220,32 @@ export default function OutdoorMap({ onEnterBuilding }) {
     const handleSelectSuggestion = useCallback((feature) => {
         const [lng, lat] = feature.center;
         const coords = [lng, lat];
-        setUserLocation(coords);
-        setAddressInput(feature.place_name);
-        setSuggestions([]);
-        setShowSuggestions(false);
-        placeUserMarker(coords);
-    }, [placeUserMarker]);
+        setCurrentLocation(coords, feature.place_name, "idle");
+    }, [setCurrentLocation]);
+
+    const applyAdminLocation = useCallback((lng, lat, label) => {
+        if (!isValidCoordinatePair(lng, lat)) {
+            setError("Admin location must include a valid longitude and latitude.");
+            return;
+        }
+
+        const coords = [lng, lat];
+        const defaultLabel = `Test location (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
+        setCurrentLocation(coords, label || defaultLabel, "mocked");
+        mapRef.current?.flyTo({ center: coords, zoom: 16 });
+    }, [setCurrentLocation]);
+
+    const handleApplyAdminLocation = useCallback(() => {
+        const lng = Number(adminLngInput);
+        const lat = Number(adminLatInput);
+        applyAdminLocation(lng, lat);
+    }, [adminLngInput, adminLatInput, applyAdminLocation]);
+
+    const handleUsePresetLocation = useCallback((preset) => {
+        setAdminLngInput(String(preset.lng));
+        setAdminLatInput(String(preset.lat));
+        applyAdminLocation(preset.lng, preset.lat, preset.label);
+    }, [applyAdminLocation]);
 
     const handleGetDirections = useCallback(async () => {
         if (!userLocation) {
@@ -279,6 +346,71 @@ export default function OutdoorMap({ onEnterBuilding }) {
                         </div>
                     </div>
 
+                    {distanceToDestinationMeters !== null && (
+                        <div className={`arrivalStatus${canEnterBuilding ? " arrivalStatusReady" : ""}`}>
+                            {canEnterBuilding
+                                ? "You are at the hospital. Switch to indoor navigation when you are ready."
+                                : `${formatDistance(distanceToDestinationMeters)} from UMass Memorial.`}
+                        </div>
+                    )}
+
+                    <div className="adminTools">
+                        <button
+                            className="adminToggleBtn"
+                            onClick={() => setShowAdminTools((prev) => !prev)}
+                            type="button"
+                        >
+                            {showAdminTools ? "Hide Admin Location Tools" : "Show Admin Location Tools"}
+                        </button>
+
+                        {showAdminTools && (
+                            <div className="adminToolsPanel">
+                                <div className="adminToolsLabel">Testing controls: set user location</div>
+
+                                <div className="adminPresetRow">
+                                    {TEST_LOCATION_PRESETS.map((preset) => (
+                                        <button
+                                            key={preset.id}
+                                            className="adminPresetBtn"
+                                            onClick={() => handleUsePresetLocation(preset)}
+                                            type="button"
+                                        >
+                                            {preset.label}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div className="adminCoordRow">
+                                    <input
+                                        className="adminCoordInput"
+                                        type="number"
+                                        step="0.000001"
+                                        value={adminLngInput}
+                                        onChange={(e) => setAdminLngInput(e.target.value)}
+                                        placeholder="Longitude"
+                                    />
+                                    <input
+                                        className="adminCoordInput"
+                                        type="number"
+                                        step="0.000001"
+                                        value={adminLatInput}
+                                        onChange={(e) => setAdminLatInput(e.target.value)}
+                                        placeholder="Latitude"
+                                    />
+                                </div>
+
+                                <div className="adminActionRow">
+                                    <button className="adminApplyBtn" onClick={handleApplyAdminLocation} type="button">
+                                        Set Test Location
+                                    </button>
+                                    <button className="adminResetBtn" onClick={locateUser} type="button">
+                                        Use Device GPS
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
                     <button
                         className={`directionsBtn${loading ? " directionsBtnLoading" : ""}`}
                         onClick={handleGetDirections}
@@ -345,7 +477,7 @@ export default function OutdoorMap({ onEnterBuilding }) {
                     </div>
                 )}
 
-                {showEnterBuilding && onEnterBuilding && (
+                {canEnterBuilding && onEnterBuilding && (
                     <div className="enterBuildingWrap">
                         <button className="enterBuildingBtn" onClick={onEnterBuilding}>
                             Enter Building — Switch to Indoor Map
