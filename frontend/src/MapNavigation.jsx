@@ -136,7 +136,7 @@ function StepItem({ icon, iconClassName, title, subtitle }) {
     );
 }
 
-export default function MapNavigation() {
+export default function MapNavigation({ initialSelection = null }) {
     const [mapData, setMapData] = useState(null);
     const [selectedBuildingId, setSelectedBuildingId] = useState("");
     const [selectedFloorId, setSelectedFloorId] = useState("");
@@ -153,6 +153,8 @@ export default function MapNavigation() {
     const mapAreaRef = useRef(null);
     const panStateRef = useRef(null);
     const toastTimer = useRef(null);
+    const initialBuildingAppliedRef = useRef(false);
+    const initialEndpointsAppliedRef = useRef(false);
 
     const showToast = useCallback((message) => {
         setToast(message);
@@ -161,6 +163,11 @@ export default function MapNavigation() {
     }, []);
 
     useEffect(() => () => clearTimeout(toastTimer.current), []);
+
+    useEffect(() => {
+        initialBuildingAppliedRef.current = false;
+        initialEndpointsAppliedRef.current = false;
+    }, [initialSelection]);
 
     useEffect(() => {
         let cancelled = false;
@@ -199,6 +206,20 @@ export default function MapNavigation() {
             cancelled = true;
         };
     }, []);
+
+    useEffect(() => {
+        const availableBuildings = Array.isArray(mapData?.buildings) ? mapData.buildings : [];
+
+        if (initialBuildingAppliedRef.current || loadingMap || availableBuildings.length === 0) {
+            return;
+        }
+
+        if (initialSelection?.buildingId && availableBuildings.some((building) => building.id === initialSelection.buildingId)) {
+            setSelectedBuildingId(initialSelection.buildingId);
+        }
+
+        initialBuildingAppliedRef.current = true;
+    }, [initialSelection, loadingMap, mapData]);
 
     const normalizedMapData = mapData || EMPTY_INDOOR_MAP;
     const { buildings, floors, rooms, nodes, edges, entrances, outdoorPoints } = normalizedMapData;
@@ -453,6 +474,45 @@ export default function MapNavigation() {
             setToEndpoint(safeTo);
         }
     }, [endpointValues, fromEndpoint, toEndpoint, entranceOptions, roomOptions]);
+
+    useEffect(() => {
+        if (initialEndpointsAppliedRef.current || !initialBuildingAppliedRef.current) {
+            return;
+        }
+
+        if (!initialSelection) {
+            initialEndpointsAppliedRef.current = true;
+            return;
+        }
+
+        if (initialSelection.buildingId && selectedBuildingId !== initialSelection.buildingId) {
+            return;
+        }
+
+        let hasAppliedSelection = false;
+
+        if (initialSelection.entranceId) {
+            const initialFrom = `entrance:${initialSelection.entranceId}`;
+            if (endpointValues.has(initialFrom)) {
+                setFromEndpoint(initialFrom);
+                hasAppliedSelection = true;
+            }
+        }
+
+        if (initialSelection.roomId) {
+            const initialTo = `room:${initialSelection.roomId}`;
+            if (endpointValues.has(initialTo)) {
+                setToEndpoint(initialTo);
+                hasAppliedSelection = true;
+            }
+        }
+
+        if (hasAppliedSelection) {
+            showToast("Indoor destination preselected");
+        }
+
+        initialEndpointsAppliedRef.current = true;
+    }, [initialSelection, selectedBuildingId, endpointValues, showToast]);
 
     const applyZoom = useCallback((nextZoom, anchor = { xRatio: 0.5, yRatio: 0.5 }) => {
         const safeZoom = clampNumber(nextZoom, MIN_MAP_ZOOM, MAX_MAP_ZOOM);
