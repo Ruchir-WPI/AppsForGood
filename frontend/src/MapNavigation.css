@@ -1,0 +1,402 @@
+.wrapper {
+    display: flex;
+    height: 100%;
+    min-height: 100vh;
+    width: 100%;
+    border-radius: 0;
+    overflow: hidden;
+    border: 1px solid #e0e0e0;
+    font-family: "DM Sans", "Segoe UI", sans-serif;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.sidebar {
+    width: 360px;
+    min-width: 360px;
+    height: 100%;
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #e8e8e8;
+    z-index: 10;
+    overflow: hidden;
+}
+
+.sidebarHeader {
+    padding: 14px 16px 0;
+    flex-shrink: 0;
+}
+
+.logo {
+    font-size: 12px;
+    font-weight: 700;
+    color: #415466;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+}
+
+.routePanel {
+    padding-bottom: 12px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.controlBlock {
+    margin-bottom: 10px;
+}
+
+.controlLabel {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 12px;
+    color: #6b7280;
+    font-weight: 600;
+}
+
+.floorTabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.floorTab {
+    border: 1px solid #d5deea;
+    background: #f6f9fd;
+    color: #3b4c60;
+    border-radius: 8px;
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.floorTabActive {
+    border-color: #1a73e8;
+    background: #e8f0fe;
+    color: #1a73e8;
+}
+
+.routeRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.routeDot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.routeDotStart {
+    background: #1a73e8;
+}
+
+.routeDotEnd {
+    background: #ea4335;
+}
+
+.routeLine {
+    width: 1px;
+    height: 14px;
+    background: #ddd;
+    margin-left: 19px;
+    margin-bottom: 6px;
+}
+
+.select {
+    flex: 1;
+    font-size: 13px;
+    border: 1px solid #d8e1eb;
+    border-radius: 8px;
+    padding: 8px 9px;
+    background: #fafcff;
+    color: #1f2b38;
+    outline: none;
+    cursor: pointer;
+}
+
+.goBtn {
+    width: 100%;
+    margin-top: 8px;
+    padding: 10px;
+    background: #1a73e8;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.goBtn:hover {
+    background: #1557b0;
+}
+
+.goBtnLoading {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.routeInfo {
+    padding: 10px 16px;
+    border-bottom: 1px solid #f0f0f0;
+    background: #f8fbff;
+}
+
+.routeMeta {
+    display: flex;
+    gap: 20px;
+}
+
+.routeStat {
+    font-size: 12px;
+    color: #56667a;
+}
+
+.routeStatNum {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1d2a38;
+    display: block;
+}
+
+.routeFloors {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #4b5b6f;
+}
+
+.errorBanner {
+    background: #fce8e6;
+    color: #c62828;
+    font-size: 12px;
+    padding: 8px 16px;
+    border-bottom: 1px solid #f5c6c2;
+}
+
+.stepsList {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px 0 0;
+}
+
+.stepItem {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 8px 16px;
+    cursor: default;
+}
+
+.stepIcon {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 2px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.iconNav {
+    background: #e8f0fe;
+    color: #1a73e8;
+}
+
+.iconDest {
+    background: #fce8e6;
+    color: #ea4335;
+}
+
+.iconInfo {
+    background: #edf2f7;
+    color: #64748b;
+}
+
+.stepText {
+    flex: 1;
+}
+
+.stepTitle {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e293b;
+    line-height: 1.35;
+}
+
+.stepSub {
+    font-size: 12px;
+    color: #64748b;
+    margin-top: 1px;
+}
+
+.metaSection {
+    border-top: 1px solid #eef2f6;
+    margin-top: 6px;
+    padding: 10px 16px 12px;
+}
+
+.metaTitle {
+    font-size: 12px;
+    font-weight: 700;
+    color: #475569;
+    margin-bottom: 4px;
+}
+
+.metaLine {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 12px;
+    color: #556477;
+    padding: 2px 0;
+}
+
+.mapArea {
+    flex: 1;
+    position: relative;
+    background: linear-gradient(135deg, #edf6ff 0%, #f4fbf7 100%);
+    overflow: hidden;
+    overscroll-behavior: contain;
+}
+
+.mapPanViewport {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    touch-action: none;
+    overscroll-behavior: contain;
+}
+
+.mapSvg {
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+}
+
+.mapPanViewportPanning .mapSvg {
+    cursor: grabbing;
+}
+
+.mapLabel {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid #d8e1eb;
+    border-radius: 8px;
+    padding: 5px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #334155;
+    z-index: 5;
+    backdrop-filter: blur(4px);
+}
+
+.legendBox {
+    position: absolute;
+    left: 12px;
+    bottom: 20px;
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid #d8e1eb;
+    border-radius: 10px;
+    padding: 8px 10px;
+    z-index: 5;
+    max-width: 210px;
+}
+
+.legendRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: #334155;
+    margin: 2px 0;
+}
+
+.legendSwatch {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    border: 1px solid transparent;
+    display: inline-block;
+}
+
+.emptyState {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #64748b;
+    font-size: 14px;
+    font-weight: 600;
+    pointer-events: none;
+}
+
+.mapControls {
+    position: absolute;
+    right: 12px;
+    bottom: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 5;
+}
+
+.mapBtn {
+    width: 32px;
+    height: 32px;
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid #d8e1eb;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+    color: #334155;
+    line-height: 1;
+}
+
+.mapBtn:hover {
+    background: #f5faff;
+}
+
+.zoomValue {
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid #d8e1eb;
+    border-radius: 8px;
+    min-width: 32px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: #334155;
+    padding: 5px 4px;
+}
+
+.toast {
+    position: absolute;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(30, 41, 59, 0.92);
+    color: #ffffff;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 10;
+}
