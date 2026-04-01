@@ -4,9 +4,13 @@ import { fetchIndoorGraphRoute, fetchIndoorMapData } from "./utils/navigationApi
 import {
     EDGE_STYLE,
     FLOOR_BG_COLORS,
+    MAX_MAP_ZOOM,
     MAP_PADDING,
     MAP_SCALE,
+    MIN_MAP_ZOOM,
+    PAN_OVERSCROLL_RATIO,
     NODE_TYPE_STYLES,
+    ZOOM_STEP,
 } from "./constants/mapNavigation";
 
 const EMPTY_INDOOR_MAP = {
@@ -63,6 +67,24 @@ function endpointLabel(endpointValue, roomMap, entranceMap) {
 
 function getNodeStyle(type) {
     return NODE_TYPE_STYLES[type] || NODE_TYPE_STYLES.default;
+}
+
+function clampNumber(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+}
+
+function clampPanForZoom(pan, zoom, mapBounds) {
+    const visibleWidth = mapBounds.width / zoom;
+    const visibleHeight = mapBounds.height / zoom;
+    const baseMaxPanX = Math.max(0, (mapBounds.width - visibleWidth) / 2);
+    const baseMaxPanY = Math.max(0, (mapBounds.height - visibleHeight) / 2);
+    const maxPanX = baseMaxPanX + (visibleWidth * PAN_OVERSCROLL_RATIO);
+    const maxPanY = baseMaxPanY + (visibleHeight * PAN_OVERSCROLL_RATIO);
+
+    return {
+        x: clampNumber(pan.x, -maxPanX, maxPanX),
+        y: clampNumber(pan.y, -maxPanY, maxPanY),
+    };
 }
 
 function computeViewBox(nodes) {
@@ -126,6 +148,10 @@ export default function MapNavigation() {
     const [error, setError] = useState(null);
     const [toast, setToast] = useState(null);
     const [zoom, setZoom] = useState(1);
+    const [pan, setPan] = useState({ x: 0, y: 0 });
+    const [isPanning, setIsPanning] = useState(false);
+    const mapAreaRef = useRef(null);
+    const panStateRef = useRef(null);
     const toastTimer = useRef(null);
 
     const showToast = useCallback((message) => {
@@ -279,6 +305,36 @@ export default function MapNavigation() {
         [buildingNodes],
     );
 
+    const mapBounds = useMemo(
+        () => ({
+            x: viewBox.minX - MAP_PADDING,
+            y: viewBox.minY - MAP_PADDING,
+            width: viewBox.width + (MAP_PADDING * 2),
+            height: viewBox.height + (MAP_PADDING * 2),
+        }),
+        [viewBox],
+    );
+
+    const clampedPan = useMemo(
+        () => clampPanForZoom(pan, zoom, mapBounds),
+        [pan, zoom, mapBounds],
+    );
+
+    const interactiveViewBox = useMemo(() => {
+        const visibleWidth = mapBounds.width / zoom;
+        const visibleHeight = mapBounds.height / zoom;
+        const x = mapBounds.x + ((mapBounds.width - visibleWidth) / 2) + clampedPan.x;
+        const y = mapBounds.y + ((mapBounds.height - visibleHeight) / 2) + clampedPan.y;
+
+        return {
+            x,
+            y,
+            width: visibleWidth,
+            height: visibleHeight,
+            value: `${x} ${y} ${visibleWidth} ${visibleHeight}`,
+        };
+    }, [mapBounds, zoom, clampedPan]);
+
     const floorIndex = useMemo(
         () => floorsForBuilding.findIndex((floor) => floor.id === selectedFloorId),
         [floorsForBuilding, selectedFloorId],
@@ -346,6 +402,14 @@ export default function MapNavigation() {
     }, [routeData, nodeMap, floorMap]);
 
     useEffect(() => {
+        setPan((currentPan) => {
+            const nextPan = clampPanForZoom(currentPan, zoom, mapBounds);
+            const hasChanged = Math.abs(nextPan.x - currentPan.x) > 0.001 || Math.abs(nextPan.y - currentPan.y) > 0.001;
+            return hasChanged ? nextPan : currentPan;
+        });
+    }, [zoom, mapBounds]);
+
+    useEffect(() => {
         if (floorsForBuilding.length === 0) {
             setSelectedFloorId("");
             return;
@@ -361,6 +425,11 @@ export default function MapNavigation() {
         setRouteData(null);
         setError(null);
     }, [selectedBuildingId]);
+
+    useEffect(() => {
+        setZoom(1);
+        setPan({ x: 0, y: 0 });
+    }, [selectedBuildingId, selectedFloorId]);
 
     useEffect(() => {
         if (endpointValues.size === 0) {
@@ -384,6 +453,144 @@ export default function MapNavigation() {
             setToEndpoint(safeTo);
         }
     }, [endpointValues, fromEndpoint, toEndpoint, entranceOptions, roomOptions]);
+
+    const applyZoom = useCallback((nextZoom, anchor = { xRatio: 0.5, yRatio: 0.5 }) => {
+        const safeZoom = clampNumber(nextZoom, MIN_MAP_ZOOM, MAX_MAP_ZOOM);
+        if (safeZoom === zoom) {
+            return;
+        }
+
+        const currentWidth = mapBounds.width / zoom;
+        const currentHeight = mapBounds.height / zoom;
+        const currentX = mapBounds.x + ((mapBounds.width - currentWidth) / 2) + clampedPan.x;
+        const currentY = mapBounds.y + ((mapBounds.height - currentHeight) / 2) + clampedPan.y;
+
+        const focusX = currentX + (anchor.xRatio * currentWidth);
+        const focusY = currentY + (anchor.yRatio * currentHeight);
+
+        const nextWidth = mapBounds.width / safeZoom;
+        const nextHeight = mapBounds.height / safeZoom;
+        const nextX = focusX - (anchor.xRatio * nextWidth);
+        const nextY = focusY - (anchor.yRatio * nextHeight);
+
+        const centeredX = mapBounds.x + ((mapBounds.width - nextWidth) / 2);
+        const centeredY = mapBounds.y + ((mapBounds.height - nextHeight) / 2);
+        const nextPan = clampPanForZoom(
+            {
+                x: nextX - centeredX,
+                y: nextY - centeredY,
+            },
+            safeZoom,
+            mapBounds,
+        );
+
+        setZoom(safeZoom);
+        setPan(nextPan);
+    }, [clampedPan, mapBounds, zoom]);
+
+    useEffect(() => {
+        const container = mapAreaRef.current;
+        if (!container) {
+            return undefined;
+        }
+
+        const handleNativeWheel = (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const rect = container.getBoundingClientRect();
+            if (rect.width <= 0 || rect.height <= 0) {
+                return;
+            }
+
+            const xRatio = clampNumber((event.clientX - rect.left) / rect.width, 0, 1);
+            const yRatio = clampNumber((event.clientY - rect.top) / rect.height, 0, 1);
+            const delta = event.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP;
+            applyZoom(zoom + delta, { xRatio, yRatio });
+        };
+
+        container.addEventListener("wheel", handleNativeWheel, { passive: false });
+
+        return () => {
+            container.removeEventListener("wheel", handleNativeWheel);
+        };
+    }, [applyZoom, zoom]);
+
+    const handlePointerDown = useCallback((event) => {
+        if (event.button !== 0) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        event.currentTarget.setPointerCapture(event.pointerId);
+        panStateRef.current = {
+            pointerId: event.pointerId,
+            startClientX: event.clientX,
+            startClientY: event.clientY,
+            startPan: clampedPan,
+        };
+        setIsPanning(true);
+    }, [clampedPan]);
+
+    const handlePointerMove = useCallback((event) => {
+        const panState = panStateRef.current;
+        if (!panState || panState.pointerId !== event.pointerId) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        const container = mapAreaRef.current;
+        if (!container) {
+            return;
+        }
+
+        const rect = container.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) {
+            return;
+        }
+
+        const visibleWidth = mapBounds.width / zoom;
+        const visibleHeight = mapBounds.height / zoom;
+        const deltaX = event.clientX - panState.startClientX;
+        const deltaY = event.clientY - panState.startClientY;
+
+        const nextPan = clampPanForZoom(
+            {
+                x: panState.startPan.x - ((deltaX / rect.width) * visibleWidth),
+                y: panState.startPan.y - ((deltaY / rect.height) * visibleHeight),
+            },
+            zoom,
+            mapBounds,
+        );
+
+        setPan(nextPan);
+    }, [mapBounds, zoom]);
+
+    const handlePointerUp = useCallback((event) => {
+        const panState = panStateRef.current;
+        if (!panState || panState.pointerId !== event.pointerId) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+        }
+
+        panStateRef.current = null;
+        setIsPanning(false);
+    }, []);
+
+    const resetMapView = useCallback(() => {
+        setZoom(1);
+        setPan({ x: 0, y: 0 });
+    }, []);
 
     const handleGetDirections = async () => {
         if (loadingMap) {
@@ -628,22 +835,29 @@ export default function MapNavigation() {
             </div>
 
             <div className="mapArea">
+                <div
+                    ref={mapAreaRef}
+                    className={`mapPanViewport${isPanning ? " mapPanViewportPanning" : ""}`}
+                >
                 <div className="mapLabel">
                     {selectedBuilding?.name || "Indoor Map"}
                     {selectedFloor ? ` - ${selectedFloor.name}` : ""}
                 </div>
 
                 <svg
-                    viewBox={viewBox.value}
+                    viewBox={interactiveViewBox.value}
                     xmlns="http://www.w3.org/2000/svg"
                     className="mapSvg"
-                    style={{ transform: `scale(${zoom})`, transformOrigin: "center center" }}
+                    onPointerDown={handlePointerDown}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                    onPointerCancel={handlePointerUp}
                 >
                     <rect
-                        x={viewBox.minX - MAP_PADDING}
-                        y={viewBox.minY - MAP_PADDING}
-                        width={viewBox.width + (MAP_PADDING * 2)}
-                        height={viewBox.height + (MAP_PADDING * 2)}
+                        x={mapBounds.x}
+                        y={mapBounds.y}
+                        width={mapBounds.width}
+                        height={mapBounds.height}
                         fill={FLOOR_BG_COLORS[Math.max(0, floorIndex) % FLOOR_BG_COLORS.length]}
                         stroke="#d8e1eb"
                         strokeWidth={1.2}
@@ -716,9 +930,9 @@ export default function MapNavigation() {
 
                                 {(node.type === "room_entrance" || node.type === "exit" || node.type === "stairs" || node.type === "elevator") && (
                                     <text
-                                        x={point.x + 5}
-                                        y={point.y - 7}
-                                        fontSize="5"
+                                        x={point.x + 9}
+                                        y={point.y - 11}
+                                        fontSize="8"
                                         fill="#1e293b"
                                         fontFamily="sans-serif"
                                         fontWeight="600"
@@ -739,19 +953,19 @@ export default function MapNavigation() {
                         return (
                             <g key={entrance.id}>
                                 <rect
-                                    x={point.x - 6.5}
-                                    y={point.y - 6.5}
-                                    width={13}
-                                    height={13}
+                                    x={point.x - 9}
+                                    y={point.y - 9}
+                                    width={18}
+                                    height={18}
                                     transform={`rotate(45 ${point.x} ${point.y})`}
                                     fill="#ffffff"
                                     stroke="#00a26d"
-                                    strokeWidth={1.5}
+                                    strokeWidth={2}
                                 />
                                 <text
-                                    x={point.x + 10}
-                                    y={point.y + 14}
-                                    fontSize="5"
+                                    x={point.x + 14}
+                                    y={point.y + 18}
+                                    fontSize="7"
                                     fill="#065f46"
                                     fontFamily="sans-serif"
                                     fontWeight="700"
@@ -763,10 +977,10 @@ export default function MapNavigation() {
                     })}
 
                     {routeStartPoint && (
-                        <circle cx={routeStartPoint.x} cy={routeStartPoint.y} r={8} fill="#1a73e8" opacity={0.25} />
+                        <circle cx={routeStartPoint.x} cy={routeStartPoint.y} r={11} fill="#1a73e8" opacity={0.25} />
                     )}
                     {routeEndPoint && (
-                        <circle cx={routeEndPoint.x} cy={routeEndPoint.y} r={8} fill="#ea4335" opacity={0.25} />
+                        <circle cx={routeEndPoint.x} cy={routeEndPoint.y} r={11} fill="#ea4335" opacity={0.25} />
                     )}
                 </svg>
 
@@ -786,12 +1000,14 @@ export default function MapNavigation() {
                 )}
 
                 <div className="mapControls">
-                    <button className="mapBtn" onClick={() => setZoom((value) => Math.min(value + 0.15, 3))}>+</button>
-                    <button className="mapBtn" onClick={() => setZoom((value) => Math.max(value - 0.15, 0.55))}>-</button>
-                    <button className="mapBtn" onClick={() => setZoom(1)} title="Reset zoom">o</button>
+                    <button className="mapBtn" onClick={() => applyZoom(zoom + ZOOM_STEP)} title="Zoom in">+</button>
+                    <button className="mapBtn" onClick={() => applyZoom(zoom - ZOOM_STEP)} title="Zoom out">-</button>
+                    <button className="mapBtn" onClick={resetMapView} title="Reset view">o</button>
+                    <div className="zoomValue">{Math.round(zoom * 100)}%</div>
                 </div>
 
                 {toast && <div className="toast">{toast}</div>}
+                </div>
             </div>
         </div>
     );
