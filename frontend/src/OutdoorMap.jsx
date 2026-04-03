@@ -164,6 +164,7 @@ export default function OutdoorMap({ onEnterBuilding }) {
 
     const [campusMapData, setCampusMapData] = useState({
         buildings: [],
+        floors: [],
         rooms: [],
         entrances: [],
     });
@@ -202,8 +203,30 @@ export default function OutdoorMap({ onEnterBuilding }) {
     );
 
     const roomsForSelectedBuilding = useMemo(
-        () => campusMapData.rooms.filter((room) => room.buildingId === selectedBuildingId),
-        [campusMapData.rooms, selectedBuildingId]
+        () => {
+            const floorLevelById = new Map(
+                campusMapData.floors.map((floor) => [floor.id, floor.level])
+            );
+
+            return campusMapData.rooms
+                .filter((room) => room.buildingId === selectedBuildingId)
+                .sort((a, b) => {
+                    const levelA = floorLevelById.get(a.floorId) ?? Number.MAX_SAFE_INTEGER;
+                    const levelB = floorLevelById.get(b.floorId) ?? Number.MAX_SAFE_INTEGER;
+
+                    if (levelA !== levelB) {
+                        return levelA - levelB;
+                    }
+
+                    return a.name.localeCompare(b.name, undefined, { numeric: true });
+                });
+        },
+        [campusMapData.rooms, campusMapData.floors, selectedBuildingId]
+    );
+
+    const floorNameById = useMemo(
+        () => new Map(campusMapData.floors.map((floor) => [floor.id, floor.name])),
+        [campusMapData.floors]
     );
 
     const selectedRoom = useMemo(
@@ -242,9 +265,10 @@ export default function OutdoorMap({ onEnterBuilding }) {
         () => fuzzyFilter(
             roomsForSelectedBuilding,
             roomQuery,
-            (room) => `${room.name} ${room.id || ""}`
+            (room) => `${room.name} ${room.id || ""} ${floorNameById.get(room.floorId) || room.floorId || ""}`,
+            Math.max(roomsForSelectedBuilding.length, 12)
         ),
-        [roomsForSelectedBuilding, roomQuery]
+        [roomsForSelectedBuilding, roomQuery, floorNameById]
     );
 
     const distanceToDestinationMeters = useMemo(() => {
@@ -315,10 +339,12 @@ export default function OutdoorMap({ onEnterBuilding }) {
                     ? payload.entrances.filter((entrance) => isWithinCampusBounds(entrance?.outdoor?.lng, entrance?.outdoor?.lat))
                     : [];
                 const safeBuildings = Array.isArray(payload.buildings) ? payload.buildings : [];
+                const safeFloors = Array.isArray(payload.floors) ? payload.floors : [];
                 const safeRooms = Array.isArray(payload.rooms) ? payload.rooms : [];
 
                 setCampusMapData({
                     buildings: safeBuildings,
+                    floors: safeFloors,
                     rooms: safeRooms,
                     entrances: safeEntrances,
                 });
@@ -696,7 +722,10 @@ export default function OutdoorMap({ onEnterBuilding }) {
                                                     onMouseDown={() => handleSelectRoom(room)}
                                                 >
                                                     <span className="suggestionName">{room.name}</span>
-                                                    <span className="suggestionPlace">{room.id}</span>
+                                                    <span className="suggestionPlace">
+                                                        {floorNameById.get(room.floorId) || room.floorId}
+                                                        {room.id ? ` · ${room.id}` : ""}
+                                                    </span>
                                                 </li>
                                             ))
                                         ) : (

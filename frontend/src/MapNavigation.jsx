@@ -4,6 +4,7 @@ import { fetchIndoorGraphRoute, fetchIndoorMapData } from "./utils/navigationApi
 import {
     EDGE_STYLE,
     FLOOR_BG_COLORS,
+    INITIAL_MAP_ZOOM,
     MAX_MAP_ZOOM,
     MAP_PADDING,
     MAP_SCALE,
@@ -147,7 +148,7 @@ export default function MapNavigation({ initialSelection = null }) {
     const [loadingRoute, setLoadingRoute] = useState(false);
     const [error, setError] = useState(null);
     const [toast, setToast] = useState(null);
-    const [zoom, setZoom] = useState(1);
+    const [zoom, setZoom] = useState(INITIAL_MAP_ZOOM);
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [isPanning, setIsPanning] = useState(false);
     const mapAreaRef = useRef(null);
@@ -448,7 +449,7 @@ export default function MapNavigation({ initialSelection = null }) {
     }, [selectedBuildingId]);
 
     useEffect(() => {
-        setZoom(1);
+        setZoom(INITIAL_MAP_ZOOM);
         setPan({ x: 0, y: 0 });
     }, [selectedBuildingId, selectedFloorId]);
 
@@ -648,7 +649,7 @@ export default function MapNavigation({ initialSelection = null }) {
     }, []);
 
     const resetMapView = useCallback(() => {
-        setZoom(1);
+        setZoom(INITIAL_MAP_ZOOM);
         setPan({ x: 0, y: 0 });
     }, []);
 
@@ -704,6 +705,7 @@ export default function MapNavigation({ initialSelection = null }) {
     };
 
     const selectedFloor = floorMap.get(selectedFloorId) || null;
+    const floorColor = FLOOR_BG_COLORS[Math.max(0, floorIndex) % FLOOR_BG_COLORS.length];
     const routeStartPoint = routeData ? projectedNodeMap.get(routeData.selectedStartNodeId) : null;
     const routeEndPoint = routeData ? projectedNodeMap.get(routeData.selectedDestinationNodeId) : null;
 
@@ -894,7 +896,7 @@ export default function MapNavigation({ initialSelection = null }) {
                 </div>
             </div>
 
-            <div className="mapArea">
+            <div className="mapArea" style={{ backgroundColor: floorColor }}>
                 <div
                     ref={mapAreaRef}
                     className={`mapPanViewport${isPanning ? " mapPanViewportPanning" : ""}`}
@@ -918,8 +920,8 @@ export default function MapNavigation({ initialSelection = null }) {
                         y={mapBounds.y}
                         width={mapBounds.width}
                         height={mapBounds.height}
-                        fill={FLOOR_BG_COLORS[Math.max(0, floorIndex) % FLOOR_BG_COLORS.length]}
-                        stroke="#d8e1eb"
+                        fill={floorColor}
+                        stroke={floorColor}
                         strokeWidth={1.2}
                         rx={10}
                     />

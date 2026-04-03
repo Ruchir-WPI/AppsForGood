@@ -1,11 +1,12 @@
-export const MAP_SCALE = 28;
-export const MAP_PADDING = 20;
+export const MAP_SCALE = 10;
+export const MAP_PADDING = 26;
 export const PAN_OVERSCROLL_RATIO = 0.4;
-export const MIN_MAP_ZOOM = 0.7;
+export const MIN_MAP_ZOOM = 0.8;
 export const MAX_MAP_ZOOM = 4;
 export const ZOOM_STEP = 0.2;
+export const INITIAL_MAP_ZOOM = 1.35;
 
-export const FLOOR_BG_COLORS = ["#f7fbff", "#f7fff8", "#fffaf2", "#fff5f9"];
+export const FLOOR_BG_COLORS = ["#eef5ff", "#eef8f1", "#fff4e8", "#f8f1ff"];
 
 export const EDGE_STYLE = {
     base: "#bfcbda",

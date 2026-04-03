@@ -263,7 +263,7 @@
 .mapArea {
     flex: 1;
     position: relative;
-    background: linear-gradient(135deg, #edf6ff 0%, #f4fbf7 100%);
+    background: #eef5ff;
     overflow: hidden;
     overscroll-behavior: contain;
 }
