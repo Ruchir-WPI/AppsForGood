@@ -10,6 +10,7 @@ function round(value) {
     return Math.round(value * 100) / 100;
 }
 
+// AI acknowledgement: This Mapbox integration service was drafted with AI assistance and reviewed by the project author.
 class MapboxService {
     constructor({
                     fetchImpl = global.fetch,

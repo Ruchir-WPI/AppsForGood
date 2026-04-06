@@ -37,6 +37,7 @@ function parseCoordinatePoint(value, fieldName) {
   return { lng, lat };
 }
 
+// AI acknowledgement: This logic was drafted with AI assistance and reviewed by the project author.
 function createIndoorMapPayload(campusData) {
   // Clone nested sample data so API consumers cannot mutate the in-memory seed.
   return {
@@ -62,6 +63,7 @@ function createIndoorMapPayload(campusData) {
   };
 }
 
+// AI acknowledgement: This backend app composition for Mapbox-powered outdoor routing and sample-campus hybrid routing was drafted with AI assistance and reviewed by the project author.
 function createApp({ routeService = null, mapboxService = null, indoorUiRouteService = null } = {}) {
   const app = express();
   // Allow tests to inject fakes while production falls back to the sample services.

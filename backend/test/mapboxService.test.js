@@ -1,6 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
+// AI acknowledgement: These Mapbox service integration-shape tests were drafted with AI assistance and reviewed by the project author.
 const MapboxService = require("../src/routing/services/MapboxService");
 
 test("MapboxService parses walking route response", async () => {
