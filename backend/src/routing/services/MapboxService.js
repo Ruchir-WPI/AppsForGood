@@ -6,6 +6,20 @@ const {
 } = require("../../indoor-routing/utils/errors");
 const { getMapboxAccessToken, getMapboxDirectionsBaseUrl } = require("../../config/env");
 
+const MASSACHUSETTS_BOUNDS = Object.freeze({
+    westLng: -73.50814,
+    southLat: 41.18706,
+    eastLng: -69.85886,
+    northLat: 42.88679,
+});
+const MASSACHUSETTS_BBOX_PARAM = [
+    MASSACHUSETTS_BOUNDS.westLng,
+    MASSACHUSETTS_BOUNDS.southLat,
+    MASSACHUSETTS_BOUNDS.eastLng,
+    MASSACHUSETTS_BOUNDS.northLat,
+].join(",");
+const UMASS_MEMORIAL_PROXIMITY_PARAM = "-71.7654,42.2776";
+
 function round(value) {
     return Math.round(value * 100) / 100;
 }
@@ -117,6 +131,8 @@ class MapboxService {
             autocomplete: "true",
             country: "us",
             types: "address,place,poi",
+            bbox: MASSACHUSETTS_BBOX_PARAM,
+            proximity: UMASS_MEMORIAL_PROXIMITY_PARAM,
             limit: String(safeLimit),
             access_token: accessToken,
         });
@@ -153,6 +169,7 @@ class MapboxService {
 
         return features
             .filter((feature) => Array.isArray(feature?.center) && feature.center.length >= 2)
+            .filter((feature) => this.#isMassachusettsCoordinate(feature.center[0], feature.center[1]))
             .map((feature) => ({
                 id: feature.id,
                 text: feature.text || "",
@@ -196,6 +213,21 @@ class MapboxService {
         if (typeof value !== "number" || !Number.isFinite(value)) {
             throw new ValidationError(`${fieldName} must be a finite number.`);
         }
+    }
+
+    #isMassachusettsCoordinate(lng, lat) {
+        if (typeof lng !== "number" || !Number.isFinite(lng)) {
+            return false;
+        }
+
+        if (typeof lat !== "number" || !Number.isFinite(lat)) {
+            return false;
+        }
+
+        return lng >= MASSACHUSETTS_BOUNDS.westLng
+            && lng <= MASSACHUSETTS_BOUNDS.eastLng
+            && lat >= MASSACHUSETTS_BOUNDS.southLat
+            && lat <= MASSACHUSETTS_BOUNDS.northLat;
     }
 }
 

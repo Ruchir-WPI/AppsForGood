@@ -129,6 +129,42 @@ function pickPrimaryEntrance(entrances) {
     return entrances[0];
 }
 
+function pickClosestEntrance(entrances, userLocation) {
+    const fallbackEntrance = pickPrimaryEntrance(entrances);
+    if (!fallbackEntrance) {
+        return null;
+    }
+
+    if (!Array.isArray(userLocation) || userLocation.length < 2) {
+        return fallbackEntrance;
+    }
+
+    const [userLng, userLat] = userLocation;
+    if (!isValidCoordinatePair(userLng, userLat)) {
+        return fallbackEntrance;
+    }
+
+    const userPoint = { lng: userLng, lat: userLat };
+    let closestEntrance = null;
+    let closestDistanceMeters = Number.POSITIVE_INFINITY;
+
+    entrances.forEach((entrance) => {
+        const lng = entrance?.outdoor?.lng;
+        const lat = entrance?.outdoor?.lat;
+        if (!isValidCoordinatePair(lng, lat)) {
+            return;
+        }
+
+        const distanceMeters = distanceBetweenMeters(userPoint, { lng, lat });
+        if (distanceMeters < closestDistanceMeters) {
+            closestDistanceMeters = distanceMeters;
+            closestEntrance = entrance;
+        }
+    });
+
+    return closestEntrance || fallbackEntrance;
+}
+
 function isWithinCampusBounds(lng, lat) {
     if (!isValidCoordinatePair(lng, lat)) {
         return false;
@@ -235,8 +271,8 @@ export default function OutdoorMap({ onEnterBuilding }) {
     );
 
     const destinationEntrance = useMemo(
-        () => pickPrimaryEntrance(buildingEntrancesMap.get(selectedBuildingId) || []),
-        [buildingEntrancesMap, selectedBuildingId]
+        () => pickClosestEntrance(buildingEntrancesMap.get(selectedBuildingId) || [], userLocation),
+        [buildingEntrancesMap, selectedBuildingId, userLocation]
     );
 
     const destinationTarget = useMemo(() => {

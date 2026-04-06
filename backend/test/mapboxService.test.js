@@ -123,8 +123,11 @@ test("MapboxService upstream error throws UPSTREAM_API_ERROR", async () => {
 
 test("MapboxService geocodeSuggestions returns normalized suggestion payload", async () => {
     process.env.MAPBOX_ACCESS_TOKEN = "test-token";
+    const fetchCalls = [];
     const service = new MapboxService({
-        fetchImpl: async () => ({
+        fetchImpl: async (url) => {
+            fetchCalls.push(url);
+            return {
             ok: true,
             status: 200,
             async json() {
@@ -139,7 +142,8 @@ test("MapboxService geocodeSuggestions returns normalized suggestion payload", a
                     ],
                 };
             },
-        }),
+            };
+        },
     });
 
     const suggestions = await service.geocodeSuggestions({
@@ -151,6 +155,46 @@ test("MapboxService geocodeSuggestions returns normalized suggestion payload", a
     assert.equal(suggestions[0].id, "address.1");
     assert.equal(suggestions[0].text, "55 Lake Ave N");
     assert.equal(suggestions[0].center[0], -71.7654);
+
+    const requestUrl = new URL(fetchCalls[0]);
+    assert.equal(requestUrl.searchParams.get("bbox"), "-73.50814,41.18706,-69.85886,42.88679");
+    assert.equal(requestUrl.searchParams.get("proximity"), "-71.7654,42.2776");
+});
+
+test("MapboxService geocodeSuggestions excludes results outside Massachusetts", async () => {
+    process.env.MAPBOX_ACCESS_TOKEN = "test-token";
+    const service = new MapboxService({
+        fetchImpl: async () => ({
+            ok: true,
+            status: 200,
+            async json() {
+                return {
+                    features: [
+                        {
+                            id: "address.ma",
+                            text: "55 Lake Ave N",
+                            place_name: "55 Lake Ave N, Worcester, Massachusetts, United States",
+                            center: [-71.7654, 42.2776],
+                        },
+                        {
+                            id: "address.mi",
+                            text: "55 Lake Ave",
+                            place_name: "55 Lake Ave, Traverse City, Michigan, United States",
+                            center: [-85.6190, 44.7631],
+                        },
+                    ],
+                };
+            },
+        }),
+    });
+
+    const suggestions = await service.geocodeSuggestions({
+        query: "55 Lake Ave",
+        limit: 5,
+    });
+
+    assert.equal(suggestions.length, 1);
+    assert.equal(suggestions[0].id, "address.ma");
 });
 
 test("MapboxService geocodeSuggestions validates integer limit", async () => {
