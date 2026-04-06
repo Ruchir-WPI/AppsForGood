@@ -2,6 +2,7 @@ const PriorityQueue = require("./PriorityQueue");
 const { ValidationError } = require("../utils/errors");
 
 function defaultHeuristic(currentNode, goalNode) {
+    // Cross-floor/building coordinates are not directly comparable, so fall back to Dijkstra there.
     if (
         currentNode.buildingId !== goalNode.buildingId ||
         currentNode.floorId !== goalNode.floorId
@@ -15,6 +16,7 @@ function defaultHeuristic(currentNode, goalNode) {
 }
 
 function reconstructPath(cameFrom, currentNodeId) {
+    // Follow parent links backward from the goal, then flip into travel order.
     const path = [currentNodeId];
     let cursor = currentNodeId;
 
@@ -65,6 +67,7 @@ function aStar({
         const currentNodeId = currentEntry.value;
         visitedNodeCount += 1;
 
+        // Ignore stale queue entries left behind after a better path was discovered.
         if ((fScore.get(currentNodeId) ?? Infinity) < currentEntry.priority) {
             continue;
         }

@@ -1,5 +1,6 @@
 const { NODE_TYPES } = require("../models/Node");
 
+// This seed includes both stairs and elevator paths so accessibility routing can be exercised.
 const campusData = {
     buildings: [
         {

@@ -33,6 +33,7 @@ class MapboxService {
 
         const accessToken = this.accessToken || getMapboxAccessToken({ required: true });
         const coordinates = `${startLng},${startLat};${endLng},${endLat}`;
+        // Ask Mapbox for full line geometry plus turn-by-turn maneuvers in one call.
         const params = new URLSearchParams({
             alternatives: "false",
             geometries: "geojson",
@@ -78,6 +79,7 @@ class MapboxService {
             });
         }
 
+        // Mapbox nests maneuver steps under legs; flatten them for the API response.
         const steps = (route.legs || []).flatMap((leg) => leg.steps || []).map((step) => ({
             instruction: step?.maneuver?.instruction || step?.name || "Continue",
             distanceMeters: round(step?.distance || 0),
@@ -113,6 +115,7 @@ class MapboxService {
         const safeLimit = this.#normalizeSuggestionLimit(limit);
         const accessToken = this.accessToken || getMapboxAccessToken({ required: true });
         const encodedQuery = encodeURIComponent(query.trim());
+        // Keep autocomplete results small and predictable for the frontend selector.
         const params = new URLSearchParams({
             autocomplete: "true",
             country: "us",
@@ -162,6 +165,7 @@ class MapboxService {
     }
 
     async geocodePlace(query) {
+        // Reuse suggestion parsing so one-off geocodes and autocomplete stay aligned.
         const suggestions = await this.geocodeSuggestions({ query, limit: 1 });
         const feature = suggestions[0];
         if (!feature?.center) {
