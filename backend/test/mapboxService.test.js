@@ -197,6 +197,99 @@ test("MapboxService geocodeSuggestions excludes results outside Massachusetts", 
     assert.equal(suggestions[0].id, "address.ma");
 });
 
+test("MapboxService geocodePlace resolves Massachusetts match even when first upstream result is out-of-state", async () => {
+    process.env.MAPBOX_ACCESS_TOKEN = "test-token";
+    const fetchCalls = [];
+    const service = new MapboxService({
+        fetchImpl: async (url) => {
+            fetchCalls.push(url);
+            return {
+                ok: true,
+                status: 200,
+                async json() {
+                    return {
+                        features: [
+                            {
+                                id: "poi.mi",
+                                text: "Union Station",
+                                place_name: "Union Station, Lansing, Michigan, United States",
+                                center: [-84.5555, 42.7339],
+                            },
+                            {
+                                id: "poi.ma",
+                                text: "Union Station",
+                                place_name: "Union Station, Worcester, Massachusetts, United States",
+                                center: [-71.7927, 42.2626],
+                            },
+                        ],
+                    };
+                },
+            };
+        },
+    });
+
+    const place = await service.geocodePlace("Union Station Worcester");
+
+    assert.equal(place.name, "Union Station, Worcester, Massachusetts, United States");
+    assert.equal(place.location.lng, -71.7927);
+    assert.equal(place.location.lat, 42.2626);
+
+    const requestUrl = new URL(fetchCalls[0]);
+    assert.equal(requestUrl.searchParams.get("limit"), "10");
+});
+
+test("MapboxService geocodeSuggestions retries with Massachusetts hint when initial query has no MA matches", async () => {
+    process.env.MAPBOX_ACCESS_TOKEN = "test-token";
+    const fetchCalls = [];
+    const service = new MapboxService({
+        fetchImpl: async (url) => {
+            fetchCalls.push(url);
+            const requestUrl = new URL(url);
+            const queryPath = decodeURIComponent(requestUrl.pathname);
+            const isHinted = queryPath.includes("Union Station, Massachusetts.json");
+
+            return {
+                ok: true,
+                status: 200,
+                async json() {
+                    if (!isHinted) {
+                        return {
+                            features: [
+                                {
+                                    id: "poi.mi",
+                                    text: "Union Station",
+                                    place_name: "Union Station, Lansing, Michigan, United States",
+                                    center: [-84.5555, 42.7339],
+                                },
+                            ],
+                        };
+                    }
+
+                    return {
+                        features: [
+                            {
+                                id: "poi.ma",
+                                text: "Union Station",
+                                place_name: "Union Station, Worcester, Massachusetts, United States",
+                                center: [-71.7927, 42.2626],
+                            },
+                        ],
+                    };
+                },
+            };
+        },
+    });
+
+    const suggestions = await service.geocodeSuggestions({
+        query: "Union Station",
+        limit: 5,
+    });
+
+    assert.equal(fetchCalls.length, 2);
+    assert.equal(suggestions.length, 1);
+    assert.equal(suggestions[0].id, "poi.ma");
+});
+
 test("MapboxService geocodeSuggestions validates integer limit", async () => {
     process.env.MAPBOX_ACCESS_TOKEN = "test-token";
     const service = new MapboxService({

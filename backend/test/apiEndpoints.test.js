@@ -15,6 +15,16 @@ function createMockMapboxService() {
                 },
             ];
         },
+        async geocodePlace(query) {
+            return {
+                query,
+                name: "Union Station, Worcester, Massachusetts, United States",
+                location: {
+                    lng: -71.7927,
+                    lat: 42.2626,
+                },
+            };
+        },
         async getWalkingRoute() {
             return {
                 provider: "mapbox",
@@ -128,6 +138,20 @@ test("GET /api/geocode/suggestions returns backend geocoder suggestions", async 
         const payload = await response.json();
         assert.ok(Array.isArray(payload.suggestions));
         assert.equal(payload.suggestions[0].id, "address.1");
+    });
+});
+
+test("GET /api/geocode/resolve converts popular place names to coordinates", async () => {
+    const app = createApp({ mapboxService: createMockMapboxService() });
+
+    await withServer(app, async (baseUrl) => {
+        const response = await fetch(`${baseUrl}/api/geocode/resolve?q=Union%20Station%20Worcester`);
+        assert.equal(response.status, 200);
+
+        const payload = await response.json();
+        assert.equal(payload.place.name, "Union Station, Worcester, Massachusetts, United States");
+        assert.equal(payload.place.location.lng, -71.7927);
+        assert.equal(payload.place.location.lat, 42.2626);
     });
 });
 

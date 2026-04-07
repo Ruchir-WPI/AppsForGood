@@ -3,6 +3,7 @@ import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "./OutdoorMap.css";
 import {
+    fetchGeocodePlace,
     fetchGeocodeSuggestions,
     fetchIndoorMapData,
     fetchOutdoorRoute,
@@ -321,6 +322,7 @@ export default function OutdoorMap({ onEnterBuilding }) {
     const canEnterBuilding = Boolean(selectedBuildingId)
         && typeof distanceToDestinationMeters === "number"
         && distanceToDestinationMeters <= ARRIVAL_PROMPT_DISTANCE_METERS;
+    const hasTypedStartLocation = normalizeSearchText(addressInput).length >= 3;
 
     useEffect(() => {
         if (mapRef.current) return;
@@ -515,14 +517,15 @@ export default function OutdoorMap({ onEnterBuilding }) {
         setAddressInput(value);
         if (value === "My current location") return;
         setGeoStatus("idle");
+        const normalizedValue = normalizeSearchText(value);
 
         try {
             const results = await fetchGeocodeSuggestions(value);
             setSuggestions(results);
-            setShowSuggestions(results.length > 0);
+            setShowSuggestions(normalizedValue.length >= 3);
         } catch (err) {
             setSuggestions([]);
-            setShowSuggestions(false);
+            setShowSuggestions(normalizedValue.length >= 3);
             setError(err.message || "Failed to load address suggestions.");
         }
     }, []);
@@ -532,6 +535,46 @@ export default function OutdoorMap({ onEnterBuilding }) {
         const coords = [lng, lat];
         setCurrentLocation(coords, feature.place_name, "idle");
     }, [setCurrentLocation]);
+
+    const resolveTypedStartLocation = useCallback(async (rawQuery) => {
+        const normalizedQuery = typeof rawQuery === "string" ? rawQuery.trim() : "";
+        if (!normalizedQuery) {
+            setError("Please set your starting location first.");
+            return null;
+        }
+
+        try {
+            const place = await fetchGeocodePlace(normalizedQuery);
+            const lng = place?.location?.lng;
+            const lat = place?.location?.lat;
+            if (!isValidCoordinatePair(lng, lat)) {
+                setError("Could not determine coordinates for that location. Try a more specific Massachusetts place name or address.");
+                return null;
+            }
+
+            const coords = [lng, lat];
+            setCurrentLocation(coords, place.name || normalizedQuery, "found");
+            mapRef.current?.flyTo({ center: coords, zoom: 15 });
+            return coords;
+        } catch (err) {
+            setError(err?.message || "Could not find that location in Massachusetts. Try a more specific place name.");
+            return null;
+        }
+    }, [setCurrentLocation]);
+
+    const handleStartLocationKeyDown = useCallback((event) => {
+        if (event.key !== "Enter") {
+            return;
+        }
+
+        event.preventDefault();
+        if (suggestions.length > 0) {
+            handleSelectSuggestion(suggestions[0]);
+            return;
+        }
+
+        void resolveTypedStartLocation(addressInput);
+    }, [suggestions, handleSelectSuggestion, resolveTypedStartLocation, addressInput]);
 
     const handleBuildingQueryChange = useCallback((value) => {
         setBuildingQuery(value);
@@ -595,11 +638,6 @@ export default function OutdoorMap({ onEnterBuilding }) {
     }, [applyAdminLocation]);
 
     const handleGetDirections = useCallback(async () => {
-        if (!userLocation) {
-            setError("Please set your starting location first.");
-            return;
-        }
-
         if (!selectedBuildingId) {
             setError("Please choose a destination building.");
             return;
@@ -615,8 +653,17 @@ export default function OutdoorMap({ onEnterBuilding }) {
         clearRoute();
 
         try {
+            let startCoords = userLocation;
+
+            if (!startCoords) {
+                startCoords = await resolveTypedStartLocation(addressInput);
+                if (!startCoords) {
+                    return;
+                }
+            }
+
             const result = await fetchOutdoorRoute({
-                start: { lng: userLocation[0], lat: userLocation[1] },
+                start: { lng: startCoords[0], lat: startCoords[1] },
                 destination: { lng: destinationTarget.lng, lat: destinationTarget.lat },
             });
 
@@ -646,7 +693,16 @@ export default function OutdoorMap({ onEnterBuilding }) {
         } finally {
             setLoading(false);
         }
-    }, [userLocation, selectedBuildingId, destinationEntrance, destinationTarget, drawRoute, clearRoute]);
+    }, [
+        userLocation,
+        addressInput,
+        selectedBuildingId,
+        destinationEntrance,
+        destinationTarget,
+        drawRoute,
+        clearRoute,
+        resolveTypedStartLocation,
+    ]);
 
     return (
         <div className="outdoorWrapper">
@@ -664,25 +720,32 @@ export default function OutdoorMap({ onEnterBuilding }) {
                                     placeholder="Enter your address…"
                                     value={addressInput}
                                     onChange={(e) => handleAddressChange(e.target.value)}
-                                    onFocus={() => setShowSuggestions(suggestions.length > 0)}
+                                    onFocus={() => setShowSuggestions(normalizeSearchText(addressInput).length >= 3)}
                                     onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                                    onKeyDown={handleStartLocationKeyDown}
                                 />
                                 {showSuggestions && (
                                     <ul className="suggestionsList">
-                                        {suggestions.map((f) => (
-                                            <li
-                                                key={f.id}
-                                                className="suggestionItem"
-                                                onMouseDown={() => handleSelectSuggestion(f)}
-                                            >
-                                                <span className="suggestionName">
-                                                    {f.text}
-                                                </span>
-                                                <span className="suggestionPlace">
-                                                    {f.place_name.split(",").slice(1).join(",").trim()}
-                                                </span>
+                                        {suggestions.length > 0 ? (
+                                            suggestions.map((f) => (
+                                                <li
+                                                    key={f.id}
+                                                    className="suggestionItem"
+                                                    onMouseDown={() => handleSelectSuggestion(f)}
+                                                >
+                                                    <span className="suggestionName">
+                                                        {f.text}
+                                                    </span>
+                                                    <span className="suggestionPlace">
+                                                        {f.place_name.split(",").slice(1).join(",").trim()}
+                                                    </span>
+                                                </li>
+                                            ))
+                                        ) : (
+                                            <li className="suggestionEmpty">
+                                                No Massachusetts matches yet. Press Enter to try the best place-name match.
                                             </li>
-                                        ))}
+                                        )}
                                     </ul>
                                 )}
                             </div>
@@ -854,7 +917,7 @@ export default function OutdoorMap({ onEnterBuilding }) {
                     <button
                         className={`directionsBtn${loading ? " directionsBtnLoading" : ""}`}
                         onClick={handleGetDirections}
-                        disabled={loading || !userLocation || !selectedBuildingId || loadingDestinations}
+                        disabled={loading || (!userLocation && !hasTypedStartLocation) || !selectedBuildingId || loadingDestinations}
                     >
                         {loading ? "Getting directions…" : "Get Walking Directions"}
                     </button>
