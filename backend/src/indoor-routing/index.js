@@ -5,6 +5,7 @@ const { Node, NODE_TYPES } = require("./models/Node");
 const Edge = require("./models/Edge");
 const Graph = require("./models/Graph");
 const { aStar, defaultHeuristic } = require("./algorithms/aStar");
+const { dijkstra } = require("./algorithms/dijkstra");
 const RouteService = require("./services/RouteService");
 const InMemoryMapRepository = require("./repositories/InMemoryMapRepository");
 const sampleCampus = require("./data/sampleCampus");
@@ -24,6 +25,7 @@ module.exports = {
     Graph,
     aStar,
     defaultHeuristic,
+    dijkstra,
     RouteService,
     InMemoryMapRepository,
     sampleCampus,

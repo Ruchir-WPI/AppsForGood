@@ -23,6 +23,11 @@ const EMPTY_INDOOR_MAP = {
     outdoorPoints: [],
 };
 
+const ALGORITHM_OPTIONS = [
+    { value: "a_star", label: "A*" },
+    { value: "dijkstra", label: "Dijkstra" },
+];
+
 function toProjectedPoint(node) {
     return {
         x: node.x * MAP_SCALE,
@@ -140,6 +145,7 @@ export default function MapNavigation() {
     const [mapData, setMapData] = useState(null);
     const [selectedBuildingId, setSelectedBuildingId] = useState("");
     const [selectedFloorId, setSelectedFloorId] = useState("");
+    const [selectedAlgorithm, setSelectedAlgorithm] = useState(ALGORITHM_OPTIONS[0].value);
     const [fromEndpoint, setFromEndpoint] = useState("");
     const [toEndpoint, setToEndpoint] = useState("");
     const [routeData, setRouteData] = useState(null);
@@ -624,6 +630,9 @@ export default function MapNavigation() {
                 start,
                 destination,
                 buildingId: selectedBuildingId,
+                options: {
+                    algorithm: selectedAlgorithm,
+                },
             });
 
             setRouteData(route);
@@ -686,10 +695,29 @@ export default function MapNavigation() {
                             ))}
                         </div>
 
+                        <div className="controlBlock">
+                            <label className="controlLabel" htmlFor="algorithm-select">Algorithm</label>
+                            <select
+                                id="algorithm-select"
+                                className="select"
+                                value={selectedAlgorithm}
+                                disabled={loadingMap || loadingRoute}
+                                onChange={(event) => {
+                                    setSelectedAlgorithm(event.target.value);
+                                    setRouteData(null);
+                                }}
+                            >
+                                {ALGORITHM_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                ))}
+                            </select>
+                        </div>
+
                         <div className="routeRow">
                             <div className="routeDot routeDotStart" />
                             <select
                                 className="select"
+                                aria-label="Start point"
                                 value={fromEndpoint}
                                 disabled={loadingMap}
                                 onChange={(event) => {
@@ -721,6 +749,7 @@ export default function MapNavigation() {
                             <div className="routeDot routeDotEnd" />
                             <select
                                 className="select"
+                                aria-label="Destination"
                                 value={toEndpoint}
                                 disabled={loadingMap}
                                 onChange={(event) => {
@@ -770,6 +799,10 @@ export default function MapNavigation() {
                             <div className="routeStat">
                                 <strong className="routeStatNum">{routeData.meta?.visitedNodeCount ?? 0}</strong>
                                 nodes visited
+                            </div>
+                            <div className="routeStat">
+                                <strong className="routeStatNum">{routeData.meta?.algorithm || "A*"}</strong>
+                                algorithm
                             </div>
                         </div>
                         {routeFloors.length > 0 && (
