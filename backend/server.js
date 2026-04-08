@@ -162,6 +162,20 @@ function createApp({ routeService = null, mapboxService = null, indoorUiRouteSer
     }
   });
 
+  app.get("/api/geocode/resolve", async (req, res, next) => {
+    try {
+      const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
+      if (!query) {
+        throw new ValidationError('Query parameter "q" is required.');
+      }
+
+      const place = await resolvedMapboxService.geocodePlace(query);
+      res.json({ place });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.get("/api/campus/buildings", (_req, res) => {
     res.json({
       buildings: resolvedIndoorUiRouteService.listBuildings(),

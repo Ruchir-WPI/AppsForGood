@@ -6,6 +6,7 @@ export const UMASS_MEMORIAL = {
 };
 
 export const ARRIVAL_PROMPT_DISTANCE_METERS = 120;
+export const DESTINATION_COORD_MAX_DISTANCE_METERS = 800;
 
 export const TEST_LOCATION_PRESETS = [
     {

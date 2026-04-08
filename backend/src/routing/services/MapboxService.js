@@ -6,6 +6,22 @@ const {
 } = require("../../indoor-routing/utils/errors");
 const { getMapboxAccessToken, getMapboxDirectionsBaseUrl } = require("../../config/env");
 
+const MASSACHUSETTS_BOUNDS = Object.freeze({
+    westLng: -73.50814,
+    southLat: 41.18706,
+    eastLng: -69.85886,
+    northLat: 42.88679,
+});
+const MASSACHUSETTS_BBOX_PARAM = [
+    MASSACHUSETTS_BOUNDS.westLng,
+    MASSACHUSETTS_BOUNDS.southLat,
+    MASSACHUSETTS_BOUNDS.eastLng,
+    MASSACHUSETTS_BOUNDS.northLat,
+].join(",");
+const UMASS_MEMORIAL_PROXIMITY_PARAM = "-71.7654,42.2776";
+const MAPBOX_SEARCHBOX_RESULT_TYPES = "address,street,place,city,locality,neighborhood,poi";
+const MAPBOX_SEARCHBOX_MAX_LIMIT = 10;
+
 function round(value) {
     return Math.round(value * 100) / 100;
 }
@@ -105,69 +121,32 @@ class MapboxService {
     }
 
     async geocodeSuggestions({ query, limit = 5 } = {}) {
-        if (typeof this.fetchImpl !== "function") {
-            throw new ConfigError("Global fetch is unavailable. Use Node.js 18+ or provide fetchImpl.");
-        }
-
         if (typeof query !== "string" || query.trim().length === 0) {
             throw new ValidationError("Geocode query must be a non-empty string.");
         }
 
+        const normalizedQuery = query.trim();
         const safeLimit = this.#normalizeSuggestionLimit(limit);
-        const accessToken = this.accessToken || getMapboxAccessToken({ required: true });
-        const encodedQuery = encodeURIComponent(query.trim());
-        // Keep autocomplete results small and predictable for the frontend selector.
-        const params = new URLSearchParams({
-            autocomplete: "true",
-            country: "us",
-            types: "address,place,poi",
-            limit: String(safeLimit),
-            access_token: accessToken,
+        const searchFeatures = await this.#fetchSearchBoxFeatures({
+            query: normalizedQuery,
+            limit: safeLimit,
+            autoComplete: true,
         });
-        const url = `${this.directionsBaseUrl}/geocoding/v5/mapbox.places/${encodedQuery}.json?${params.toString()}`;
 
-        let response;
-        try {
-            response = await this.fetchImpl(url);
-        } catch (error) {
-            throw new UpstreamApiError("Mapbox Geocoding request failed.", {
-                provider: "mapbox",
-                reason: "NETWORK_FAILURE",
-                cause: error?.message || String(error),
-            }, 503);
-        }
-
-        let payload = null;
-        try {
-            payload = await response.json();
-        } catch (_error) {
-            payload = null;
-        }
-
-        if (!response.ok) {
-            throw new UpstreamApiError("Mapbox Geocoding returned an error response.", {
-                provider: "mapbox",
-                upstreamStatus: response.status,
-                upstreamCode: payload?.code || null,
-                message: payload?.message || null,
-            }, response.status >= 500 ? 503 : 502);
-        }
-
-        const features = Array.isArray(payload?.features) ? payload.features : [];
-
-        return features
-            .filter((feature) => Array.isArray(feature?.center) && feature.center.length >= 2)
-            .map((feature) => ({
-                id: feature.id,
-                text: feature.text || "",
-                place_name: feature.place_name || feature.text || "",
-                center: [feature.center[0], feature.center[1]],
-            }));
+        return this.#normalizeSearchBoxFeatures(searchFeatures).slice(0, safeLimit);
     }
 
     async geocodePlace(query) {
-        // Reuse suggestion parsing so one-off geocodes and autocomplete stay aligned.
-        const suggestions = await this.geocodeSuggestions({ query, limit: 1 });
+        if (typeof query !== "string" || query.trim().length === 0) {
+            throw new ValidationError("Geocode query must be a non-empty string.");
+        }
+
+        const searchFeatures = await this.#fetchSearchBoxFeatures({
+            query: query.trim(),
+            limit: 1,
+            autoComplete: false,
+        });
+        const suggestions = this.#normalizeSearchBoxFeatures(searchFeatures);
         const feature = suggestions[0];
         if (!feature?.center) {
             throw new RouteNotFoundError(`No geocoding result found for "${query}".`, {
@@ -185,13 +164,114 @@ class MapboxService {
         };
     }
 
+    async #fetchSearchBoxFeatures({ query, limit, autoComplete }) {
+        if (typeof this.fetchImpl !== "function") {
+            throw new ConfigError("Global fetch is unavailable. Use Node.js 18+ or provide fetchImpl.");
+        }
+
+        const accessToken = this.accessToken || getMapboxAccessToken({ required: true });
+        const params = new URLSearchParams({
+            q: query,
+            language: "en",
+            country: "US",
+            types: MAPBOX_SEARCHBOX_RESULT_TYPES,
+            bbox: MASSACHUSETTS_BBOX_PARAM,
+            proximity: UMASS_MEMORIAL_PROXIMITY_PARAM,
+            limit: String(limit),
+            auto_complete: autoComplete ? "true" : "false",
+            access_token: accessToken,
+        });
+        const url = `${this.directionsBaseUrl}/search/searchbox/v1/forward?${params.toString()}`;
+
+        let response;
+        try {
+            response = await this.fetchImpl(url);
+        } catch (error) {
+            throw new UpstreamApiError("Mapbox Search Box request failed.", {
+                provider: "mapbox",
+                reason: "NETWORK_FAILURE",
+                cause: error?.message || String(error),
+            }, 503);
+        }
+
+        let payload = null;
+        try {
+            payload = await response.json();
+        } catch (_error) {
+            payload = null;
+        }
+
+        if (!response.ok) {
+            throw new UpstreamApiError("Mapbox Search Box returned an error response.", {
+                provider: "mapbox",
+                upstreamStatus: response.status,
+                upstreamCode: payload?.code || null,
+                message: payload?.message || null,
+            }, response.status >= 500 ? 503 : 502);
+        }
+
+        return Array.isArray(payload?.features) ? payload.features : [];
+    }
+
+    #normalizeSearchBoxFeatures(features) {
+        const normalized = [];
+        const seen = new Set();
+
+        features.forEach((feature) => {
+            const coords = this.#extractFeatureCoordinates(feature);
+            if (!coords) {
+                return;
+            }
+
+            const [lng, lat] = coords;
+            if (!this.#isMassachusettsCoordinate(lng, lat)) {
+                return;
+            }
+
+            const properties = feature?.properties || {};
+            const text = properties.name || properties.name_preferred || feature?.text || "";
+            const placeName = properties.full_address
+                || [properties.address, properties.place_formatted].filter(Boolean).join(", ")
+                || feature?.place_name
+                || text;
+            const fallbackKey = `${lng.toFixed(6)},${lat.toFixed(6)}:${placeName || text}`;
+            const key = properties.mapbox_id || feature.id || fallbackKey;
+            if (seen.has(key)) {
+                return;
+            }
+
+            seen.add(key);
+            normalized.push({
+                id: key,
+                text,
+                place_name: placeName,
+                center: [lng, lat],
+            });
+        });
+
+        return normalized;
+    }
+
+    #extractFeatureCoordinates(feature) {
+        if (Array.isArray(feature?.center) && feature.center.length >= 2) {
+            return [feature.center[0], feature.center[1]];
+        }
+
+        const geometryCoordinates = feature?.geometry?.coordinates;
+        if (Array.isArray(geometryCoordinates) && geometryCoordinates.length >= 2) {
+            return [geometryCoordinates[0], geometryCoordinates[1]];
+        }
+
+        return null;
+    }
+
     #normalizeSuggestionLimit(limit) {
         if (!Number.isInteger(limit)) {
             throw new ValidationError("Geocode limit must be an integer.");
         }
 
-        if (limit < 1 || limit > 10) {
-            throw new ValidationError("Geocode limit must be between 1 and 10.");
+        if (limit < 1 || limit > MAPBOX_SEARCHBOX_MAX_LIMIT) {
+            throw new ValidationError(`Geocode limit must be between 1 and ${MAPBOX_SEARCHBOX_MAX_LIMIT}.`);
         }
 
         return limit;
@@ -201,6 +281,21 @@ class MapboxService {
         if (typeof value !== "number" || !Number.isFinite(value)) {
             throw new ValidationError(`${fieldName} must be a finite number.`);
         }
+    }
+
+    #isMassachusettsCoordinate(lng, lat) {
+        if (typeof lng !== "number" || !Number.isFinite(lng)) {
+            return false;
+        }
+
+        if (typeof lat !== "number" || !Number.isFinite(lat)) {
+            return false;
+        }
+
+        return lng >= MASSACHUSETTS_BOUNDS.westLng
+            && lng <= MASSACHUSETTS_BOUNDS.eastLng
+            && lat >= MASSACHUSETTS_BOUNDS.southLat
+            && lat <= MASSACHUSETTS_BOUNDS.northLat;
     }
 }
 
