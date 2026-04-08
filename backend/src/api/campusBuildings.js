@@ -1,3 +1,4 @@
+// Coarse campus-map coordinates used by the lightweight indoor-ui preview service.
 const campusBuildings = [
     { id: "ambulatory", label: "Ambulatory Care Center", cx: 280, cy: 417, type: "clinical" },
     { id: "albert-sherman", label: "Albert Sherman Center", cx: 180, cy: 417, type: "clinical" },

@@ -26,6 +26,7 @@ function round(value) {
     return Math.round(value * 100) / 100;
 }
 
+// AI acknowledgement: This Mapbox integration service was drafted with AI assistance and reviewed by the project author.
 class MapboxService {
     constructor({
                     fetchImpl = global.fetch,
@@ -49,6 +50,7 @@ class MapboxService {
 
         const accessToken = this.accessToken || getMapboxAccessToken({ required: true });
         const coordinates = `${startLng},${startLat};${endLng},${endLat}`;
+        // Ask Mapbox for full line geometry plus turn-by-turn maneuvers in one call.
         const params = new URLSearchParams({
             alternatives: "false",
             geometries: "geojson",
@@ -94,6 +96,7 @@ class MapboxService {
             });
         }
 
+        // Mapbox nests maneuver steps under legs; flatten them for the API response.
         const steps = (route.legs || []).flatMap((leg) => leg.steps || []).map((step) => ({
             instruction: step?.maneuver?.instruction || step?.name || "Continue",
             distanceMeters: round(step?.distance || 0),

@@ -1,5 +1,7 @@
 const { NODE_TYPES } = require("../models/Node");
 
+// AI acknowledgement: This sample campus seed dataset was drafted with AI assistance and reviewed by the project author.
+// This seed includes both stairs and elevator paths so accessibility routing can be exercised.
 const BUILDING_ID = "building-main";
 
 const CORRIDOR_TEMPLATE = [

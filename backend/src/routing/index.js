@@ -2,6 +2,7 @@ const { createSampleRouteService, sampleCampus } = require("../indoor-routing");
 const MapboxService = require("./services/MapboxService");
 const { HybridRouteService } = require("./services/HybridRouteService");
 
+// AI acknowledgement: This default Mapbox + sample-campus service wiring was drafted with AI assistance and reviewed by the project author.
 function createSampleHybridRouteService({
                                             indoorRouteService = createSampleRouteService(),
                                             mapboxService = new MapboxService(),
