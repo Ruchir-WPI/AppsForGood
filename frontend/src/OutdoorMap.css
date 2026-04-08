@@ -473,6 +473,7 @@
 }
 
 .locationModalTitle {
+    margin: 0;
     font-size: 15px;
     font-weight: 700;
     color: #22304d;
@@ -491,6 +492,12 @@
 
 .locationModalCloseBtn:hover {
     background: #edf3ff;
+}
+
+.locationModalCloseBtn:focus-visible,
+.locationModalItem:focus-visible {
+    outline: 2px solid #1a73e8;
+    outline-offset: -2px;
 }
 
 .locationModalSubtitle {
@@ -522,10 +529,14 @@
 }
 
 .locationModalItem {
+    width: 100%;
     padding: 10px 16px;
     display: flex;
     flex-direction: column;
     gap: 2px;
+    text-align: left;
+    border: 0;
+    background: transparent;
     border-bottom: 1px solid #f2f4f9;
     cursor: pointer;
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo, useId } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "./OutdoorMap.css";
@@ -184,6 +184,10 @@ export default function OutdoorMap({ onEnterBuilding }) {
     const mapLoadedRef = useRef(false);
     const userMarkerRef = useRef(null);
     const destMarkerRef = useRef(null);
+    const startLocationInputRef = useRef(null);
+    const locationSearchModalRef = useRef(null);
+    const locationSearchModalCloseButtonRef = useRef(null);
+    const locationSearchModalReturnFocusRef = useRef(null);
 
     const [userLocation, setUserLocation] = useState(null);
     const [addressInput, setAddressInput] = useState("");
@@ -328,6 +332,8 @@ export default function OutdoorMap({ onEnterBuilding }) {
         && typeof distanceToDestinationMeters === "number"
         && distanceToDestinationMeters <= ARRIVAL_PROMPT_DISTANCE_METERS;
     const hasTypedStartLocation = normalizeSearchText(addressInput).length >= 3;
+    const locationSearchModalTitleId = useId();
+    const locationSearchModalDescriptionId = useId();
 
     useEffect(() => {
         if (mapRef.current) return;
@@ -579,22 +585,47 @@ export default function OutdoorMap({ onEnterBuilding }) {
         };
     }, [showLocationSearchModal, addressInput]);
 
+    const getLocationSearchModalFocusableElements = useCallback(() => {
+        if (!locationSearchModalRef.current) {
+            return [];
+        }
+
+        return Array.from(locationSearchModalRef.current.querySelectorAll(
+            [
+                "button:not([disabled])",
+                "[href]",
+                "input:not([disabled])",
+                "select:not([disabled])",
+                "textarea:not([disabled])",
+                "[tabindex]:not([tabindex=\"-1\"])",
+            ].join(", ")
+        ));
+    }, []);
+
+    const closeLocationSearchModal = useCallback(() => {
+        setShowLocationSearchModal(false);
+    }, []);
+
     useEffect(() => {
-        if (!showLocationSearchModal) {
+        if (showLocationSearchModal) {
+            const focusTarget = locationSearchModalCloseButtonRef.current
+                || getLocationSearchModalFocusableElements()[0]
+                || locationSearchModalRef.current;
+            focusTarget?.focus();
             return;
         }
 
-        const onKeyDown = (event) => {
-            if (event.key === "Escape") {
-                setShowLocationSearchModal(false);
-            }
-        };
+        if (!locationSearchModalReturnFocusRef.current) {
+            return;
+        }
 
-        window.addEventListener("keydown", onKeyDown);
-        return () => {
-            window.removeEventListener("keydown", onKeyDown);
-        };
-    }, [showLocationSearchModal]);
+        const returnFocusTarget = locationSearchModalReturnFocusRef.current.isConnected
+            ? locationSearchModalReturnFocusRef.current
+            : startLocationInputRef.current;
+
+        returnFocusTarget?.focus();
+        locationSearchModalReturnFocusRef.current = null;
+    }, [showLocationSearchModal, getLocationSearchModalFocusableElements]);
 
     const handleSelectSuggestion = useCallback((feature) => {
         const [lng, lat] = feature.center;
@@ -645,6 +676,11 @@ export default function OutdoorMap({ onEnterBuilding }) {
     const handleOpenLocationSearchModal = useCallback((event) => {
         if (event) {
             event.preventDefault();
+            if (event.currentTarget instanceof HTMLElement) {
+                locationSearchModalReturnFocusRef.current = event.currentTarget;
+            }
+        } else if (document.activeElement instanceof HTMLElement) {
+            locationSearchModalReturnFocusRef.current = document.activeElement;
         }
 
         setShowSuggestions(false);
@@ -655,8 +691,48 @@ export default function OutdoorMap({ onEnterBuilding }) {
 
     const handleSelectExpandedSuggestion = useCallback((feature) => {
         handleSelectSuggestion(feature);
-        setShowLocationSearchModal(false);
-    }, [handleSelectSuggestion]);
+        closeLocationSearchModal();
+    }, [closeLocationSearchModal, handleSelectSuggestion]);
+
+    const handleLocationSearchModalKeyDown = useCallback((event) => {
+        if (event.key === "Escape") {
+            event.preventDefault();
+            closeLocationSearchModal();
+            return;
+        }
+
+        if (event.key !== "Tab") {
+            return;
+        }
+
+        const focusableElements = getLocationSearchModalFocusableElements();
+        if (focusableElements.length === 0) {
+            event.preventDefault();
+            locationSearchModalRef.current?.focus();
+            return;
+        }
+
+        const firstFocusableElement = focusableElements[0];
+        const lastFocusableElement = focusableElements[focusableElements.length - 1];
+        const activeElement = document.activeElement;
+
+        if (!locationSearchModalRef.current?.contains(activeElement)) {
+            event.preventDefault();
+            (event.shiftKey ? lastFocusableElement : firstFocusableElement).focus();
+            return;
+        }
+
+        if (event.shiftKey && activeElement === firstFocusableElement) {
+            event.preventDefault();
+            lastFocusableElement.focus();
+            return;
+        }
+
+        if (!event.shiftKey && activeElement === lastFocusableElement) {
+            event.preventDefault();
+            firstFocusableElement.focus();
+        }
+    }, [closeLocationSearchModal, getLocationSearchModalFocusableElements]);
 
     const handleBuildingQueryChange = useCallback((value) => {
         setBuildingQuery(value);
@@ -797,6 +873,7 @@ export default function OutdoorMap({ onEnterBuilding }) {
                         <div className="locationInputRow">
                             <div className="locationInputWrap">
                                 <input
+                                    ref={startLocationInputRef}
                                     className="locationInput"
                                     type="text"
                                     placeholder="Enter your address…"
@@ -833,7 +910,8 @@ export default function OutdoorMap({ onEnterBuilding }) {
                                                 <button
                                                     type="button"
                                                     className="suggestionMoreBtn"
-                                                    onMouseDown={handleOpenLocationSearchModal}
+                                                    onMouseDown={(event) => event.preventDefault()}
+                                                    onClick={handleOpenLocationSearchModal}
                                                 >
                                                     View More Results
                                                 </button>
@@ -1094,39 +1172,51 @@ export default function OutdoorMap({ onEnterBuilding }) {
             {showLocationSearchModal && (
                 <div
                     className="locationModalBackdrop"
-                    onMouseDown={() => setShowLocationSearchModal(false)}
+                    onMouseDown={closeLocationSearchModal}
                 >
                     <div
+                        ref={locationSearchModalRef}
                         className="locationModal"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby={locationSearchModalTitleId}
+                        aria-describedby={locationSearchModalDescriptionId}
+                        tabIndex={-1}
+                        onKeyDown={handleLocationSearchModalKeyDown}
                         onMouseDown={(event) => event.stopPropagation()}
                     >
                         <div className="locationModalHeader">
-                            <div className="locationModalTitle">More Location Results</div>
+                            <h2 id={locationSearchModalTitleId} className="locationModalTitle">
+                                More Location Results
+                            </h2>
                             <button
+                                ref={locationSearchModalCloseButtonRef}
                                 type="button"
                                 className="locationModalCloseBtn"
-                                onClick={() => setShowLocationSearchModal(false)}
+                                onClick={closeLocationSearchModal}
                             >
                                 Close
                             </button>
                         </div>
-                        <div className="locationModalSubtitle">
+                        <div id={locationSearchModalDescriptionId} className="locationModalSubtitle">
                             Showing up to {EXPANDED_GEOCODE_LIMIT} Massachusetts matches for "{addressInput.trim()}"
                         </div>
 
-                        <div className="locationModalBody">
+                        <div className="locationModalBody" aria-busy={expandedSuggestionsLoading}>
                             {expandedSuggestionsLoading && (
-                                <div className="locationModalState">Loading locations...</div>
+                                <div className="locationModalState" role="status">
+                                    Loading locations...
+                                </div>
                             )}
 
                             {!expandedSuggestionsLoading && expandedSuggestionsError && (
-                                <div className="locationModalState locationModalStateError">
+                                <div className="locationModalState locationModalStateError" role="alert">
                                     {expandedSuggestionsError}
                                 </div>
                             )}
 
                             {!expandedSuggestionsLoading && !expandedSuggestionsError && expandedSuggestions.length === 0 && (
-                                <div className="locationModalState">
+                                <div className="locationModalState" role="status">
                                     No additional matches found. Try adding city or landmark details.
                                 </div>
                             )}
@@ -1134,15 +1224,17 @@ export default function OutdoorMap({ onEnterBuilding }) {
                             {!expandedSuggestionsLoading && !expandedSuggestionsError && expandedSuggestions.length > 0 && (
                                 <ul className="locationModalList">
                                     {expandedSuggestions.map((feature) => (
-                                        <li
-                                            key={feature.id}
-                                            className="locationModalItem"
-                                            onMouseDown={() => handleSelectExpandedSuggestion(feature)}
-                                        >
-                                            <span className="suggestionName">{feature.text}</span>
-                                            <span className="suggestionPlace">
-                                                {feature.place_name.split(",").slice(1).join(",").trim()}
-                                            </span>
+                                        <li key={feature.id}>
+                                            <button
+                                                type="button"
+                                                className="locationModalItem"
+                                                onClick={() => handleSelectExpandedSuggestion(feature)}
+                                            >
+                                                <span className="suggestionName">{feature.text}</span>
+                                                <span className="suggestionPlace">
+                                                    {feature.place_name.split(",").slice(1).join(",").trim()}
+                                                </span>
+                                            </button>
                                         </li>
                                     ))}
                                 </ul>
