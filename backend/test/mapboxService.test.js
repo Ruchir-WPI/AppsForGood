@@ -235,7 +235,7 @@ test("MapboxService geocodePlace resolves Massachusetts match even when first up
     assert.equal(place.location.lat, 42.2626);
 
     const requestUrl = new URL(fetchCalls[0]);
-    assert.equal(requestUrl.searchParams.get("limit"), "10");
+    assert.equal(requestUrl.searchParams.get("limit"), "20");
 });
 
 test("MapboxService geocodeSuggestions retries with Massachusetts hint when initial query has no MA matches", async () => {

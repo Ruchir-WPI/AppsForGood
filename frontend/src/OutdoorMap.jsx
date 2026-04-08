@@ -14,6 +14,7 @@ import {
     TEST_LOCATION_PRESETS,
     UMASS_MEMORIAL,
 } from "./constants/outdoorMap";
+import { EXPANDED_GEOCODE_LIMIT } from "./constants/api";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -188,6 +189,10 @@ export default function OutdoorMap({ onEnterBuilding }) {
     const [addressInput, setAddressInput] = useState("");
     const [suggestions, setSuggestions] = useState([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
+    const [showLocationSearchModal, setShowLocationSearchModal] = useState(false);
+    const [expandedSuggestions, setExpandedSuggestions] = useState([]);
+    const [expandedSuggestionsLoading, setExpandedSuggestionsLoading] = useState(false);
+    const [expandedSuggestionsError, setExpandedSuggestionsError] = useState("");
     const [routeInfo, setRouteInfo] = useState(null);
     const [steps, setSteps] = useState([]);
     const [activeStep, setActiveStep] = useState(0);
@@ -530,6 +535,67 @@ export default function OutdoorMap({ onEnterBuilding }) {
         }
     }, []);
 
+    useEffect(() => {
+        let cancelled = false;
+
+        async function loadExpandedSuggestions() {
+            const normalizedQuery = typeof addressInput === "string" ? addressInput.trim() : "";
+            if (!showLocationSearchModal || normalizedQuery.length < 3) {
+                setExpandedSuggestions([]);
+                setExpandedSuggestionsError("");
+                setExpandedSuggestionsLoading(false);
+                return;
+            }
+
+            setExpandedSuggestionsLoading(true);
+            setExpandedSuggestionsError("");
+
+            try {
+                const results = await fetchGeocodeSuggestions(normalizedQuery, {
+                    limit: EXPANDED_GEOCODE_LIMIT,
+                });
+
+                if (!cancelled) {
+                    setExpandedSuggestions(results);
+                }
+            } catch (err) {
+                if (!cancelled) {
+                    setExpandedSuggestions([]);
+                    setExpandedSuggestionsError(
+                        err?.message || "Failed to load expanded location suggestions."
+                    );
+                }
+            } finally {
+                if (!cancelled) {
+                    setExpandedSuggestionsLoading(false);
+                }
+            }
+        }
+
+        loadExpandedSuggestions();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [showLocationSearchModal, addressInput]);
+
+    useEffect(() => {
+        if (!showLocationSearchModal) {
+            return;
+        }
+
+        const onKeyDown = (event) => {
+            if (event.key === "Escape") {
+                setShowLocationSearchModal(false);
+            }
+        };
+
+        window.addEventListener("keydown", onKeyDown);
+        return () => {
+            window.removeEventListener("keydown", onKeyDown);
+        };
+    }, [showLocationSearchModal]);
+
     const handleSelectSuggestion = useCallback((feature) => {
         const [lng, lat] = feature.center;
         const coords = [lng, lat];
@@ -575,6 +641,22 @@ export default function OutdoorMap({ onEnterBuilding }) {
 
         void resolveTypedStartLocation(addressInput);
     }, [suggestions, handleSelectSuggestion, resolveTypedStartLocation, addressInput]);
+
+    const handleOpenLocationSearchModal = useCallback((event) => {
+        if (event) {
+            event.preventDefault();
+        }
+
+        setShowSuggestions(false);
+        setExpandedSuggestions([]);
+        setExpandedSuggestionsError("");
+        setShowLocationSearchModal(true);
+    }, []);
+
+    const handleSelectExpandedSuggestion = useCallback((feature) => {
+        handleSelectSuggestion(feature);
+        setShowLocationSearchModal(false);
+    }, [handleSelectSuggestion]);
 
     const handleBuildingQueryChange = useCallback((value) => {
         setBuildingQuery(value);
@@ -744,6 +826,17 @@ export default function OutdoorMap({ onEnterBuilding }) {
                                         ) : (
                                             <li className="suggestionEmpty">
                                                 No Massachusetts matches yet. Press Enter to try the best place-name match.
+                                            </li>
+                                        )}
+                                        {hasTypedStartLocation && (
+                                            <li className="suggestionMoreRow">
+                                                <button
+                                                    type="button"
+                                                    className="suggestionMoreBtn"
+                                                    onMouseDown={handleOpenLocationSearchModal}
+                                                >
+                                                    View More Results
+                                                </button>
                                             </li>
                                         )}
                                     </ul>
@@ -997,6 +1090,67 @@ export default function OutdoorMap({ onEnterBuilding }) {
             </div>
 
             <div className="outdoorMapCanvas" ref={mapContainerRef} />
+
+            {showLocationSearchModal && (
+                <div
+                    className="locationModalBackdrop"
+                    onMouseDown={() => setShowLocationSearchModal(false)}
+                >
+                    <div
+                        className="locationModal"
+                        onMouseDown={(event) => event.stopPropagation()}
+                    >
+                        <div className="locationModalHeader">
+                            <div className="locationModalTitle">More Location Results</div>
+                            <button
+                                type="button"
+                                className="locationModalCloseBtn"
+                                onClick={() => setShowLocationSearchModal(false)}
+                            >
+                                Close
+                            </button>
+                        </div>
+                        <div className="locationModalSubtitle">
+                            Showing up to {EXPANDED_GEOCODE_LIMIT} Massachusetts matches for "{addressInput.trim()}"
+                        </div>
+
+                        <div className="locationModalBody">
+                            {expandedSuggestionsLoading && (
+                                <div className="locationModalState">Loading locations...</div>
+                            )}
+
+                            {!expandedSuggestionsLoading && expandedSuggestionsError && (
+                                <div className="locationModalState locationModalStateError">
+                                    {expandedSuggestionsError}
+                                </div>
+                            )}
+
+                            {!expandedSuggestionsLoading && !expandedSuggestionsError && expandedSuggestions.length === 0 && (
+                                <div className="locationModalState">
+                                    No additional matches found. Try adding city or landmark details.
+                                </div>
+                            )}
+
+                            {!expandedSuggestionsLoading && !expandedSuggestionsError && expandedSuggestions.length > 0 && (
+                                <ul className="locationModalList">
+                                    {expandedSuggestions.map((feature) => (
+                                        <li
+                                            key={feature.id}
+                                            className="locationModalItem"
+                                            onMouseDown={() => handleSelectExpandedSuggestion(feature)}
+                                        >
+                                            <span className="suggestionName">{feature.text}</span>
+                                            <span className="suggestionPlace">
+                                                {feature.place_name.split(",").slice(1).join(",").trim()}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -20,7 +20,7 @@ const MASSACHUSETTS_BBOX_PARAM = [
 ].join(",");
 const UMASS_MEMORIAL_PROXIMITY_PARAM = "-71.7654,42.2776";
 const MAPBOX_GEOCODE_FEATURE_TYPES = "address,place,locality,neighborhood,poi";
-const MAPBOX_INTERNAL_GEOCODE_LIMIT = 10;
+const MAPBOX_INTERNAL_GEOCODE_LIMIT = 20;
 
 function round(value) {
     return Math.round(value * 100) / 100;
@@ -294,8 +294,8 @@ class MapboxService {
             throw new ValidationError("Geocode limit must be an integer.");
         }
 
-        if (limit < 1 || limit > 10) {
-            throw new ValidationError("Geocode limit must be between 1 and 10.");
+        if (limit < 1 || limit > MAPBOX_INTERNAL_GEOCODE_LIMIT) {
+            throw new ValidationError(`Geocode limit must be between 1 and ${MAPBOX_INTERNAL_GEOCODE_LIMIT}.`);
         }
 
         return limit;
