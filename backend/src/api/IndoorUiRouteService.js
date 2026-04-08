@@ -68,6 +68,7 @@ class IndoorUiRouteService {
             { x: fromBuilding.cx, y: fromBuilding.cy },
         ];
 
+        // Add a simple dogleg so diagonal trips follow the campus grid more naturally.
         if (
             Math.abs(fromBuilding.cx - toBuilding.cx) > 40
             && Math.abs(fromBuilding.cy - toBuilding.cy) > 40
@@ -83,6 +84,7 @@ class IndoorUiRouteService {
         const dx = fromBuilding.cx - toBuilding.cx;
         const dy = fromBuilding.cy - toBuilding.cy;
         const straightLineUnits = Math.sqrt((dx ** 2) + (dy ** 2));
+        // These are rough UI estimates derived from map pixels, not GIS-grade measurements.
         const distanceFeet = Math.round(straightLineUnits * FEET_PER_MAP_UNIT);
         const walkMinutes = Math.max(1, Math.round(distanceFeet / WALKING_FEET_PER_MINUTE));
 
@@ -97,6 +99,7 @@ class IndoorUiRouteService {
         const dy = toBuilding.cy - fromBuilding.cy;
         const steps = [];
 
+        // This service favors simple directional hints over exact pathfinding.
         if (Math.abs(dx) > Math.abs(dy)) {
             steps.push(`Head ${dx > 0 ? "east" : "west"} along the main corridor`);
             if (Math.abs(dy) > 30) {

@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 
 const { createApp } = require("../server");
 
+// AI acknowledgement: These API endpoint tests covering Mapbox-backed and sample-campus backend flows were drafted with AI assistance and reviewed by the project author.
 function createMockMapboxService() {
     return {
         async geocodeSuggestions() {

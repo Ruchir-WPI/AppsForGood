@@ -39,6 +39,7 @@ class HybridRouteService {
     }
 
     #normalizeRequest(request) {
+        // Preserve the older flat request shape while newer clients send nested endpoints.
         const start =
             request.start ||
             this.#endpointFromLegacyFields({
@@ -57,6 +58,7 @@ class HybridRouteService {
         }
 
         const hasOutdoorStart = Boolean(start.coordinates || start.parkingGarageId);
+        // No outdoor locator means this is still a pure indoor route request.
         if (!hasOutdoorStart) {
             return {
                 mode: "indoor",
@@ -89,6 +91,7 @@ class HybridRouteService {
 
         let bestRoute = null;
 
+        // Try each valid entrance and keep the cheapest outdoor + indoor combination.
         for (const entrance of candidateEntrances) {
             let outdoorRoute = null;
             try {
@@ -190,6 +193,7 @@ class HybridRouteService {
             instruction: `Enter through ${bestRoute.entrance.label} and continue inside.`,
             source: "system",
         };
+        // Flatten both legs into one instruction list for clients that render a single timeline.
         const stitchedSteps = [
             ...outdoorLeg.steps.map((step) => ({
                 legType: "outdoor",
@@ -239,6 +243,7 @@ class HybridRouteService {
 
     #resolveCandidateEntrances(destination, wheelchairRequired) {
         let entrances = [];
+        // A requested entrance bypasses scoring across the full building entrance list.
         if (destination.entranceId) {
             const entrance = this.campusData.getEntranceById(destination.entranceId);
             if (!entrance) {
@@ -316,6 +321,7 @@ class HybridRouteService {
         let buildingId;
         const indoorTarget = {};
 
+        // Normalize mixed room/node inputs into the shape expected by the indoor router.
         if (hasNodeId) {
             const node = graph.getNode(destination.nodeId);
             buildingId = node.buildingId;

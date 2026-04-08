@@ -3,6 +3,7 @@ const { ConfigError } = require("../indoor-routing/utils/errors");
 const DEFAULT_MAPBOX_DIRECTIONS_BASE_URL = "https://api.mapbox.com";
 
 function getMapboxDirectionsBaseUrl() {
+    // Allow tests or proxies to swap the upstream host without patching the service code.
     return process.env.MAPBOX_DIRECTIONS_BASE_URL || DEFAULT_MAPBOX_DIRECTIONS_BASE_URL;
 }
 
