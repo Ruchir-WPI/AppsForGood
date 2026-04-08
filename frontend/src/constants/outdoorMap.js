@@ -8,6 +8,12 @@ export const UMASS_MEMORIAL = {
 export const ARRIVAL_PROMPT_DISTANCE_METERS = 120;
 export const DESTINATION_COORD_MAX_DISTANCE_METERS = 800;
 
+export const OUTDOOR_TRANSPORT_MODES = [
+    { value: "walking", label: "Walking" },
+    { value: "cycling", label: "Cycling" },
+    { value: "driving", label: "Driving" },
+];
+
 export const TEST_LOCATION_PRESETS = [
     {
         id: "arrival",

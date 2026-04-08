@@ -115,13 +115,25 @@ function createApp({ routeService = null, mapboxService = null, indoorUiRouteSer
       // Support both the current and older payload field names from the frontend.
       const startPoint = parseCoordinatePoint(req.body?.start ?? req.body?.origin, "start");
       const destinationPoint = parseCoordinatePoint(req.body?.destination ?? req.body?.end, "destination");
+      const requestedMode = req.body?.mode ?? req.body?.profile ?? "walking";
 
-      const route = await resolvedMapboxService.getWalkingRoute({
-        startLng: startPoint.lng,
-        startLat: startPoint.lat,
-        endLng: destinationPoint.lng,
-        endLat: destinationPoint.lat,
-      });
+      let route;
+      if (typeof resolvedMapboxService.getRoute === "function") {
+        route = await resolvedMapboxService.getRoute({
+          startLng: startPoint.lng,
+          startLat: startPoint.lat,
+          endLng: destinationPoint.lng,
+          endLat: destinationPoint.lat,
+          profile: requestedMode,
+        });
+      } else {
+        route = await resolvedMapboxService.getWalkingRoute({
+          startLng: startPoint.lng,
+          startLat: startPoint.lat,
+          endLng: destinationPoint.lng,
+          endLat: destinationPoint.lat,
+        });
+      }
 
       res.json({
         route: {

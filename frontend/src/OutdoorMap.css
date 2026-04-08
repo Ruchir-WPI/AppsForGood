@@ -133,6 +133,11 @@
     color: #222;
 }
 
+.suggestionAddress {
+    font-size: 11px;
+    color: #4b5563;
+}
+
 .suggestionPlace {
     font-size: 11px;
     color: #888;
