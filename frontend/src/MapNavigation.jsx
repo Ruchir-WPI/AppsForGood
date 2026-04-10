@@ -4,6 +4,7 @@ import { fetchIndoorGraphRoute, fetchIndoorMapData } from "./utils/navigationApi
 import {
     EDGE_STYLE,
     FLOOR_BG_COLORS,
+    INDOOR_ROUTING_ALGORITHM,
     MAX_MAP_ZOOM,
     MAP_PADDING,
     MAP_SCALE,
@@ -22,11 +23,6 @@ const EMPTY_INDOOR_MAP = {
     entrances: [],
     outdoorPoints: [],
 };
-
-const ALGORITHM_OPTIONS = [
-    { value: "a_star", label: "A*" },
-    { value: "dijkstra", label: "Dijkstra" },
-];
 
 function toProjectedPoint(node) {
     return {
@@ -145,7 +141,6 @@ export default function MapNavigation() {
     const [mapData, setMapData] = useState(null);
     const [selectedBuildingId, setSelectedBuildingId] = useState("");
     const [selectedFloorId, setSelectedFloorId] = useState("");
-    const [selectedAlgorithm, setSelectedAlgorithm] = useState(ALGORITHM_OPTIONS[0].value);
     const [fromEndpoint, setFromEndpoint] = useState("");
     const [toEndpoint, setToEndpoint] = useState("");
     const [routeData, setRouteData] = useState(null);
@@ -631,7 +626,7 @@ export default function MapNavigation() {
                 destination,
                 buildingId: selectedBuildingId,
                 options: {
-                    algorithm: selectedAlgorithm,
+                    algorithm: INDOOR_ROUTING_ALGORITHM,
                 },
             });
 
@@ -693,24 +688,6 @@ export default function MapNavigation() {
                                     {floor.name}
                                 </button>
                             ))}
-                        </div>
-
-                        <div className="controlBlock">
-                            <label className="controlLabel" htmlFor="algorithm-select">Algorithm</label>
-                            <select
-                                id="algorithm-select"
-                                className="select"
-                                value={selectedAlgorithm}
-                                disabled={loadingMap || loadingRoute}
-                                onChange={(event) => {
-                                    setSelectedAlgorithm(event.target.value);
-                                    setRouteData(null);
-                                }}
-                            >
-                                {ALGORITHM_OPTIONS.map((option) => (
-                                    <option key={option.value} value={option.value}>{option.label}</option>
-                                ))}
-                            </select>
                         </div>
 
                         <div className="routeRow">

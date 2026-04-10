@@ -4,6 +4,7 @@ export const PAN_OVERSCROLL_RATIO = 0.4;
 export const MIN_MAP_ZOOM = 0.7;
 export const MAX_MAP_ZOOM = 4;
 export const ZOOM_STEP = 0.2;
+export const INDOOR_ROUTING_ALGORITHM = "dijkstra"; // "a_star" or "dijkstra"
 
 export const FLOOR_BG_COLORS = ["#f7fbff", "#f7fff8", "#fffaf2", "#fff5f9"];
 

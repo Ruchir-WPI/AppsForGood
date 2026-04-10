@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import MapNavigation from "../MapNavigation.jsx";
+import { INDOOR_ROUTING_ALGORITHM } from "../constants/mapNavigation";
 import { fetchIndoorGraphRoute, fetchIndoorMapData } from "../utils/navigationApi";
 
 const indoorMapFixture = {
@@ -64,7 +65,7 @@ describe("MapNavigation", () => {
                 },
             ],
             meta: {
-                algorithm: "A*",
+                algorithm: "Dijkstra",
                 visitedNodeCount: 3,
             },
         });
@@ -91,7 +92,7 @@ describe("MapNavigation", () => {
                 destination: { roomId: "r2" },
                 buildingId: "b1",
                 options: {
-                    algorithm: "a_star",
+                    algorithm: INDOOR_ROUTING_ALGORITHM,
                 },
             });
         });
@@ -102,7 +103,7 @@ describe("MapNavigation", () => {
         expect(screen.getByText(/indoor route generated/i)).toBeInTheDocument();
     });
 
-    it("sends the selected Dijkstra algorithm with the indoor route request", async () => {
+    it("uses the developer-configured algorithm for the indoor route request", async () => {
         fetchIndoorGraphRoute.mockResolvedValue({
             selectedStartNodeId: "n1",
             selectedDestinationNodeId: "n3",
@@ -121,10 +122,6 @@ describe("MapNavigation", () => {
 
         await waitFor(() => expect(routeButton).toBeEnabled());
 
-        fireEvent.change(screen.getByLabelText(/algorithm/i), {
-            target: { value: "dijkstra" },
-        });
-
         const fromSelect = screen.getByRole("combobox", { name: /start point/i });
         const toSelect = screen.getByRole("combobox", { name: /destination/i });
 
@@ -141,10 +138,12 @@ describe("MapNavigation", () => {
                 destination: { roomId: "r2" },
                 buildingId: "b1",
                 options: {
-                    algorithm: "dijkstra",
+                    algorithm: INDOOR_ROUTING_ALGORITHM,
                 },
             });
         });
+
+        expect(screen.queryByLabelText(/algorithm/i)).not.toBeInTheDocument();
     });
 
     it("shows an error banner when route generation fails", async () => {
