@@ -1,6 +1,6 @@
 import { useState } from "react";
-import OutdoorMap from "./OutdoorMap.jsx";
-import MapNavigation from "./MapNavigation.jsx";
+import OutdoorNavigation from "./OutdoorNavigation.jsx";
+import IndoorNavigation from "./IndoorNavigation.jsx";
 
 // AI acknowledgement: This top-level mode switch that carries outdoor destination context into indoor navigation was drafted with AI assistance and reviewed by the project author.
 export default function App() {
@@ -8,7 +8,7 @@ export default function App() {
     const [indoorSelection, setIndoorSelection] = useState(null);
 
     return mode === "outdoor" ? (
-        <OutdoorMap
+        <OutdoorNavigation
             onEnterBuilding={(selection) => {
                 setIndoorSelection(selection || null);
                 setMode("indoor");
@@ -16,7 +16,7 @@ export default function App() {
         />
     ) : (
         <div style={{ position: "relative", height: "100vh" }}>
-            <MapNavigation initialSelection={indoorSelection} />
+            <IndoorNavigation initialSelection={indoorSelection} />
 
             <button
                 onClick={() => setMode("outdoor")}

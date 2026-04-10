@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import "./MapNavigation.css";
+import "./IndoorNavigation.css";
 import { fetchIndoorGraphRoute, fetchIndoorMapData } from "./utils/navigationApi";
 import {
     CORRIDOR_BASE_WIDTH,
@@ -21,7 +21,7 @@ import {
     ROOM_AREA_OPACITY,
     SPECIAL_AREA_OPACITY,
     ZOOM_STEP,
-} from "./constants/mapNavigation";
+} from "./constants/indoorNavigation";
 
 const EMPTY_INDOOR_MAP = {
     buildings: [],
@@ -332,7 +332,7 @@ function StepItem({ icon, iconClassName, title, subtitle }) {
 }
 
 // AI acknowledgement: This indoor navigation composition for floor-aware rendering, endpoint controls, and route visualization was drafted with AI assistance and reviewed by the project author.
-export default function MapNavigation({ initialSelection = null }) {
+export default function IndoorNavigation({ initialSelection = null }) {
     const [mapData, setMapData] = useState(null);
     const [selectedBuildingId, setSelectedBuildingId] = useState("");
     const [selectedFloorId, setSelectedFloorId] = useState("");

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo, useId } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
-import "./OutdoorMap.css";
+import "./OutdoorNavigation.css";
 import {
     fetchGeocodePlace,
     fetchGeocodeSuggestions,
@@ -14,7 +14,7 @@ import {
     OUTDOOR_TRANSPORT_MODES,
     TEST_LOCATION_PRESETS,
     UMASS_MEMORIAL,
-} from "./constants/outdoorMap";
+} from "./constants/outdoorNavigation";
 import { EXPANDED_GEOCODE_LIMIT } from "./constants/api";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
@@ -229,7 +229,7 @@ function isWithinCampusBounds(lng, lat) {
 }
 
 // AI acknowledgement: This outdoor map flow for geocoded start input, destination handoff, and transport-mode routing was drafted with AI assistance and reviewed by the project author.
-export default function OutdoorMap({ onEnterBuilding }) {
+export default function OutdoorNavigation({ onEnterBuilding }) {
     const mapContainerRef = useRef(null);
     const mapRef = useRef(null);
     const mapLoadedRef = useRef(false);
@@ -1244,7 +1244,7 @@ export default function OutdoorMap({ onEnterBuilding }) {
                 )}
             </div>
 
-            <div className="outdoorMapCanvas" ref={mapContainerRef} />
+            <div className="outdoorNavigationCanvas" ref={mapContainerRef} />
 
             {showLocationSearchModal && (
                 <div
