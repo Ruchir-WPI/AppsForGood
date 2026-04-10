@@ -10,6 +10,7 @@ const RouteService = require("./services/RouteService");
 const InMemoryMapRepository = require("./repositories/InMemoryMapRepository");
 const sampleCampus = require("./data/sampleCampus");
 
+// AI acknowledgement: This sample-campus bootstrap for the in-memory route repository was drafted with AI assistance and reviewed by the project author.
 function createSampleRouteService() {
     const repository = new InMemoryMapRepository(sampleCampus);
     return new RouteService({ mapRepository: repository });

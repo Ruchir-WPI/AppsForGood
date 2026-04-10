@@ -1,13 +1,20 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo, useId } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "./OutdoorMap.css";
-import { fetchGeocodeSuggestions, fetchOutdoorRoute } from "./utils/navigationApi";
+import {
+    fetchGeocodePlace,
+    fetchGeocodeSuggestions,
+    fetchIndoorMapData,
+    fetchOutdoorRoute,
+} from "./utils/navigationApi";
 import {
     ARRIVAL_PROMPT_DISTANCE_METERS,
+    DESTINATION_COORD_MAX_DISTANCE_METERS,
     TEST_LOCATION_PRESETS,
     UMASS_MEMORIAL,
 } from "./constants/outdoorMap";
+import { EXPANDED_GEOCODE_LIMIT } from "./constants/api";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -49,17 +56,147 @@ function distanceBetweenMeters(from, to) {
     return earthRadiusMeters * c;
 }
 
+function normalizeSearchText(value) {
+    return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+function fuzzyScore(query, target) {
+    const normalizedQuery = normalizeSearchText(query);
+    const normalizedTarget = normalizeSearchText(target);
+
+    if (!normalizedQuery) {
+        return 1;
+    }
+
+    if (!normalizedTarget) {
+        return -1;
+    }
+
+    const containsIndex = normalizedTarget.indexOf(normalizedQuery);
+    if (containsIndex >= 0) {
+        return 100 - containsIndex;
+    }
+
+    let queryIndex = 0;
+    let score = 0;
+
+    for (let i = 0; i < normalizedTarget.length && queryIndex < normalizedQuery.length; i += 1) {
+        if (normalizedTarget[i] === normalizedQuery[queryIndex]) {
+            score += 2;
+            if (queryIndex > 0 && normalizedTarget[i - 1] === normalizedQuery[queryIndex - 1]) {
+                score += 1;
+            }
+            queryIndex += 1;
+        }
+    }
+
+    return queryIndex === normalizedQuery.length ? score : -1;
+}
+
+function fuzzyFilter(items, query, labelForItem, limit = 8) {
+    return items
+        .map((item) => ({
+            item,
+            score: fuzzyScore(query, labelForItem(item)),
+        }))
+        .filter((entry) => entry.score >= 0)
+        .sort((a, b) => {
+            if (b.score !== a.score) {
+                return b.score - a.score;
+            }
+
+            return labelForItem(a.item).localeCompare(labelForItem(b.item));
+        })
+        .slice(0, limit)
+        .map((entry) => entry.item);
+}
+
+function pickPrimaryEntrance(entrances) {
+    if (!Array.isArray(entrances) || entrances.length === 0) {
+        return null;
+    }
+
+    const mainEntrance = entrances.find(
+        (entrance) => typeof entrance.label === "string" && entrance.label.toLowerCase().includes("main")
+    );
+    if (mainEntrance) {
+        return mainEntrance;
+    }
+
+    const accessibleEntrance = entrances.find((entrance) => entrance.wheelchairAccessible);
+    if (accessibleEntrance) {
+        return accessibleEntrance;
+    }
+
+    return entrances[0];
+}
+
+function pickClosestEntrance(entrances, userLocation) {
+    const fallbackEntrance = pickPrimaryEntrance(entrances);
+    if (!fallbackEntrance) {
+        return null;
+    }
+
+    if (!Array.isArray(userLocation) || userLocation.length < 2) {
+        return fallbackEntrance;
+    }
+
+    const [userLng, userLat] = userLocation;
+    if (!isValidCoordinatePair(userLng, userLat)) {
+        return fallbackEntrance;
+    }
+
+    const userPoint = { lng: userLng, lat: userLat };
+    let closestEntrance = null;
+    let closestDistanceMeters = Number.POSITIVE_INFINITY;
+
+    entrances.forEach((entrance) => {
+        const lng = entrance?.outdoor?.lng;
+        const lat = entrance?.outdoor?.lat;
+        if (!isValidCoordinatePair(lng, lat)) {
+            return;
+        }
+
+        const distanceMeters = distanceBetweenMeters(userPoint, { lng, lat });
+        if (distanceMeters < closestDistanceMeters) {
+            closestDistanceMeters = distanceMeters;
+            closestEntrance = entrance;
+        }
+    });
+
+    return closestEntrance || fallbackEntrance;
+}
+
+function isWithinCampusBounds(lng, lat) {
+    if (!isValidCoordinatePair(lng, lat)) {
+        return false;
+    }
+
+    return distanceBetweenMeters(
+        { lng, lat },
+        { lng: UMASS_MEMORIAL.lng, lat: UMASS_MEMORIAL.lat }
+    ) <= DESTINATION_COORD_MAX_DISTANCE_METERS;
+}
+
 export default function OutdoorMap({ onEnterBuilding }) {
     const mapContainerRef = useRef(null);
     const mapRef = useRef(null);
     const mapLoadedRef = useRef(false);
     const userMarkerRef = useRef(null);
     const destMarkerRef = useRef(null);
+    const startLocationInputRef = useRef(null);
+    const locationSearchModalRef = useRef(null);
+    const locationSearchModalCloseButtonRef = useRef(null);
+    const locationSearchModalReturnFocusRef = useRef(null);
 
     const [userLocation, setUserLocation] = useState(null);
     const [addressInput, setAddressInput] = useState("");
     const [suggestions, setSuggestions] = useState([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
+    const [showLocationSearchModal, setShowLocationSearchModal] = useState(false);
+    const [expandedSuggestions, setExpandedSuggestions] = useState([]);
+    const [expandedSuggestionsLoading, setExpandedSuggestionsLoading] = useState(false);
+    const [expandedSuggestionsError, setExpandedSuggestionsError] = useState("");
     const [routeInfo, setRouteInfo] = useState(null);
     const [steps, setSteps] = useState([]);
     const [activeStep, setActiveStep] = useState(0);
@@ -69,20 +206,134 @@ export default function OutdoorMap({ onEnterBuilding }) {
     const [showAdminTools, setShowAdminTools] = useState(false);
     const [adminLngInput, setAdminLngInput] = useState(String(UMASS_MEMORIAL.lng));
     const [adminLatInput, setAdminLatInput] = useState(String(UMASS_MEMORIAL.lat));
+    const [isMapReady, setIsMapReady] = useState(false);
+
+    const [campusMapData, setCampusMapData] = useState({
+        buildings: [],
+        floors: [],
+        rooms: [],
+        entrances: [],
+    });
+    const [loadingDestinations, setLoadingDestinations] = useState(true);
+    const [selectedBuildingId, setSelectedBuildingId] = useState("");
+    const [selectedRoomId, setSelectedRoomId] = useState("");
+    const [buildingQuery, setBuildingQuery] = useState("");
+    const [roomQuery, setRoomQuery] = useState("");
+    const [showBuildingSuggestions, setShowBuildingSuggestions] = useState(false);
+    const [showRoomSuggestions, setShowRoomSuggestions] = useState(false);
+
+    const buildingEntrancesMap = useMemo(() => {
+        const entranceMap = new Map();
+
+        campusMapData.entrances.forEach((entrance) => {
+            if (!isValidCoordinatePair(entrance?.outdoor?.lng, entrance?.outdoor?.lat)) {
+                return;
+            }
+
+            const current = entranceMap.get(entrance.buildingId) || [];
+            current.push(entrance);
+            entranceMap.set(entrance.buildingId, current);
+        });
+
+        return entranceMap;
+    }, [campusMapData.entrances]);
+
+    const availableBuildings = useMemo(
+        () => campusMapData.buildings.filter((building) => buildingEntrancesMap.has(building.id)),
+        [campusMapData.buildings, buildingEntrancesMap]
+    );
+
+    const selectedBuilding = useMemo(
+        () => availableBuildings.find((building) => building.id === selectedBuildingId) || null,
+        [availableBuildings, selectedBuildingId]
+    );
+
+    const roomsForSelectedBuilding = useMemo(
+        () => {
+            const floorLevelById = new Map(
+                campusMapData.floors.map((floor) => [floor.id, floor.level])
+            );
+
+            return campusMapData.rooms
+                .filter((room) => room.buildingId === selectedBuildingId)
+                .sort((a, b) => {
+                    const levelA = floorLevelById.get(a.floorId) ?? Number.MAX_SAFE_INTEGER;
+                    const levelB = floorLevelById.get(b.floorId) ?? Number.MAX_SAFE_INTEGER;
+
+                    if (levelA !== levelB) {
+                        return levelA - levelB;
+                    }
+
+                    return a.name.localeCompare(b.name, undefined, { numeric: true });
+                });
+        },
+        [campusMapData.rooms, campusMapData.floors, selectedBuildingId]
+    );
+
+    const floorNameById = useMemo(
+        () => new Map(campusMapData.floors.map((floor) => [floor.id, floor.name])),
+        [campusMapData.floors]
+    );
+
+    const selectedRoom = useMemo(
+        () => roomsForSelectedBuilding.find((room) => room.id === selectedRoomId) || null,
+        [roomsForSelectedBuilding, selectedRoomId]
+    );
+
+    const destinationEntrance = useMemo(
+        () => pickClosestEntrance(buildingEntrancesMap.get(selectedBuildingId) || [], userLocation),
+        [buildingEntrancesMap, selectedBuildingId, userLocation]
+    );
+
+    const destinationTarget = useMemo(() => {
+        if (destinationEntrance && isWithinCampusBounds(destinationEntrance.outdoor.lng, destinationEntrance.outdoor.lat)) {
+            return {
+                lng: destinationEntrance.outdoor.lng,
+                lat: destinationEntrance.outdoor.lat,
+                label: selectedBuilding?.name || UMASS_MEMORIAL.label,
+                address: UMASS_MEMORIAL.address,
+            };
+        }
+
+        return UMASS_MEMORIAL;
+    }, [destinationEntrance, selectedBuilding]);
+
+    const buildingSuggestions = useMemo(
+        () => fuzzyFilter(
+            availableBuildings,
+            buildingQuery,
+            (building) => `${building.name} ${building.code || ""} ${building.description || ""}`
+        ),
+        [availableBuildings, buildingQuery]
+    );
+
+    const roomSuggestions = useMemo(
+        () => fuzzyFilter(
+            roomsForSelectedBuilding,
+            roomQuery,
+            (room) => `${room.name} ${room.id || ""} ${floorNameById.get(room.floorId) || room.floorId || ""}`,
+            Math.max(roomsForSelectedBuilding.length, 12)
+        ),
+        [roomsForSelectedBuilding, roomQuery, floorNameById]
+    );
 
     const distanceToDestinationMeters = useMemo(() => {
-        if (!userLocation) {
+        if (!userLocation || !selectedBuildingId) {
             return null;
         }
 
         return distanceBetweenMeters(
             { lng: userLocation[0], lat: userLocation[1] },
-            { lng: UMASS_MEMORIAL.lng, lat: UMASS_MEMORIAL.lat }
+            { lng: destinationTarget.lng, lat: destinationTarget.lat }
         );
-    }, [userLocation]);
+    }, [userLocation, selectedBuildingId, destinationTarget]);
 
-    const canEnterBuilding = typeof distanceToDestinationMeters === "number"
+    const canEnterBuilding = Boolean(selectedBuildingId)
+        && typeof distanceToDestinationMeters === "number"
         && distanceToDestinationMeters <= ARRIVAL_PROMPT_DISTANCE_METERS;
+    const hasTypedStartLocation = normalizeSearchText(addressInput).length >= 3;
+    const locationSearchModalTitleId = useId();
+    const locationSearchModalDescriptionId = useId();
 
     useEffect(() => {
         if (mapRef.current) return;
@@ -98,6 +349,7 @@ export default function OutdoorMap({ onEnterBuilding }) {
 
         map.on("load", () => {
             mapLoadedRef.current = true;
+            setIsMapReady(true);
 
             const destEl = document.createElement("div");
             destEl.className = "markerDest";
@@ -114,10 +366,81 @@ export default function OutdoorMap({ onEnterBuilding }) {
         mapRef.current = map;
         return () => {
             mapLoadedRef.current = false;
+            setIsMapReady(false);
             map.remove();
             mapRef.current = null;
         };
     }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function loadDestinationData() {
+            setLoadingDestinations(true);
+
+            try {
+                const payload = await fetchIndoorMapData();
+                if (cancelled) {
+                    return;
+                }
+
+                const safeEntrances = Array.isArray(payload.entrances)
+                    ? payload.entrances.filter((entrance) => isWithinCampusBounds(entrance?.outdoor?.lng, entrance?.outdoor?.lat))
+                    : [];
+                const safeBuildings = Array.isArray(payload.buildings) ? payload.buildings : [];
+                const safeFloors = Array.isArray(payload.floors) ? payload.floors : [];
+                const safeRooms = Array.isArray(payload.rooms) ? payload.rooms : [];
+
+                setCampusMapData({
+                    buildings: safeBuildings,
+                    floors: safeFloors,
+                    rooms: safeRooms,
+                    entrances: safeEntrances,
+                });
+
+                const defaultBuilding = safeBuildings.find((building) => (
+                    safeEntrances.some((entrance) => entrance.buildingId === building.id)
+                )) || null;
+
+                if (defaultBuilding) {
+                    setSelectedBuildingId(defaultBuilding.id);
+                    setBuildingQuery(defaultBuilding.name);
+                }
+            } catch (err) {
+                if (!cancelled) {
+                    setError(err.message || "Failed to load destination building data.");
+                }
+            } finally {
+                if (!cancelled) {
+                    setLoadingDestinations(false);
+                }
+            }
+        }
+
+        loadDestinationData();
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!isMapReady || !destMarkerRef.current) {
+            return;
+        }
+
+        const popupSuffix = destinationTarget.address
+            ? `<br/>${destinationTarget.address}`
+            : "";
+
+        destMarkerRef.current
+            .setLngLat([destinationTarget.lng, destinationTarget.lat])
+            .setPopup(
+                new mapboxgl.Popup({ offset: 25 }).setHTML(
+                    `<strong>${destinationTarget.label}</strong>${popupSuffix}`
+                )
+            );
+    }, [destinationTarget, isMapReady]);
 
     const drawRoute = useCallback((geojsonGeometry) => {
         const map = mapRef.current;
@@ -205,23 +528,248 @@ export default function OutdoorMap({ onEnterBuilding }) {
         setAddressInput(value);
         if (value === "My current location") return;
         setGeoStatus("idle");
+        const normalizedValue = normalizeSearchText(value);
 
         try {
             const results = await fetchGeocodeSuggestions(value);
             setSuggestions(results);
-            setShowSuggestions(results.length > 0);
+            setShowSuggestions(normalizedValue.length >= 3);
         } catch (err) {
             setSuggestions([]);
-            setShowSuggestions(false);
+            setShowSuggestions(normalizedValue.length >= 3);
             setError(err.message || "Failed to load address suggestions.");
         }
     }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function loadExpandedSuggestions() {
+            const normalizedQuery = typeof addressInput === "string" ? addressInput.trim() : "";
+            if (!showLocationSearchModal || normalizedQuery.length < 3) {
+                setExpandedSuggestions([]);
+                setExpandedSuggestionsError("");
+                setExpandedSuggestionsLoading(false);
+                return;
+            }
+
+            setExpandedSuggestionsLoading(true);
+            setExpandedSuggestionsError("");
+
+            try {
+                const results = await fetchGeocodeSuggestions(normalizedQuery, {
+                    limit: EXPANDED_GEOCODE_LIMIT,
+                });
+
+                if (!cancelled) {
+                    setExpandedSuggestions(results);
+                }
+            } catch (err) {
+                if (!cancelled) {
+                    setExpandedSuggestions([]);
+                    setExpandedSuggestionsError(
+                        err?.message || "Failed to load expanded location suggestions."
+                    );
+                }
+            } finally {
+                if (!cancelled) {
+                    setExpandedSuggestionsLoading(false);
+                }
+            }
+        }
+
+        loadExpandedSuggestions();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [showLocationSearchModal, addressInput]);
+
+    const getLocationSearchModalFocusableElements = useCallback(() => {
+        if (!locationSearchModalRef.current) {
+            return [];
+        }
+
+        return Array.from(locationSearchModalRef.current.querySelectorAll(
+            [
+                "button:not([disabled])",
+                "[href]",
+                "input:not([disabled])",
+                "select:not([disabled])",
+                "textarea:not([disabled])",
+                "[tabindex]:not([tabindex=\"-1\"])",
+            ].join(", ")
+        ));
+    }, []);
+
+    const closeLocationSearchModal = useCallback(() => {
+        setShowLocationSearchModal(false);
+    }, []);
+
+    useEffect(() => {
+        if (showLocationSearchModal) {
+            const focusTarget = locationSearchModalCloseButtonRef.current
+                || getLocationSearchModalFocusableElements()[0]
+                || locationSearchModalRef.current;
+            focusTarget?.focus();
+            return;
+        }
+
+        if (!locationSearchModalReturnFocusRef.current) {
+            return;
+        }
+
+        const returnFocusTarget = locationSearchModalReturnFocusRef.current.isConnected
+            ? locationSearchModalReturnFocusRef.current
+            : startLocationInputRef.current;
+
+        returnFocusTarget?.focus();
+        locationSearchModalReturnFocusRef.current = null;
+    }, [showLocationSearchModal, getLocationSearchModalFocusableElements]);
 
     const handleSelectSuggestion = useCallback((feature) => {
         const [lng, lat] = feature.center;
         const coords = [lng, lat];
         setCurrentLocation(coords, feature.place_name, "idle");
     }, [setCurrentLocation]);
+
+    const resolveTypedStartLocation = useCallback(async (rawQuery) => {
+        const normalizedQuery = typeof rawQuery === "string" ? rawQuery.trim() : "";
+        if (!normalizedQuery) {
+            setError("Please set your starting location first.");
+            return null;
+        }
+
+        try {
+            const place = await fetchGeocodePlace(normalizedQuery);
+            const lng = place?.location?.lng;
+            const lat = place?.location?.lat;
+            if (!isValidCoordinatePair(lng, lat)) {
+                setError("Could not determine coordinates for that location. Try a more specific Massachusetts place name or address.");
+                return null;
+            }
+
+            const coords = [lng, lat];
+            setCurrentLocation(coords, place.name || normalizedQuery, "found");
+            mapRef.current?.flyTo({ center: coords, zoom: 15 });
+            return coords;
+        } catch (err) {
+            setError(err?.message || "Could not find that location in Massachusetts. Try a more specific place name.");
+            return null;
+        }
+    }, [setCurrentLocation]);
+
+    const handleStartLocationKeyDown = useCallback((event) => {
+        if (event.key !== "Enter") {
+            return;
+        }
+
+        event.preventDefault();
+        if (suggestions.length > 0) {
+            handleSelectSuggestion(suggestions[0]);
+            return;
+        }
+
+        void resolveTypedStartLocation(addressInput);
+    }, [suggestions, handleSelectSuggestion, resolveTypedStartLocation, addressInput]);
+
+    const handleOpenLocationSearchModal = useCallback((event) => {
+        if (event) {
+            event.preventDefault();
+            if (event.currentTarget instanceof HTMLElement) {
+                locationSearchModalReturnFocusRef.current = event.currentTarget;
+            }
+        } else if (document.activeElement instanceof HTMLElement) {
+            locationSearchModalReturnFocusRef.current = document.activeElement;
+        }
+
+        setShowSuggestions(false);
+        setExpandedSuggestions([]);
+        setExpandedSuggestionsError("");
+        setShowLocationSearchModal(true);
+    }, []);
+
+    const handleSelectExpandedSuggestion = useCallback((feature) => {
+        handleSelectSuggestion(feature);
+        closeLocationSearchModal();
+    }, [closeLocationSearchModal, handleSelectSuggestion]);
+
+    const handleLocationSearchModalKeyDown = useCallback((event) => {
+        if (event.key === "Escape") {
+            event.preventDefault();
+            closeLocationSearchModal();
+            return;
+        }
+
+        if (event.key !== "Tab") {
+            return;
+        }
+
+        const focusableElements = getLocationSearchModalFocusableElements();
+        if (focusableElements.length === 0) {
+            event.preventDefault();
+            locationSearchModalRef.current?.focus();
+            return;
+        }
+
+        const firstFocusableElement = focusableElements[0];
+        const lastFocusableElement = focusableElements[focusableElements.length - 1];
+        const activeElement = document.activeElement;
+
+        if (!locationSearchModalRef.current?.contains(activeElement)) {
+            event.preventDefault();
+            (event.shiftKey ? lastFocusableElement : firstFocusableElement).focus();
+            return;
+        }
+
+        if (event.shiftKey && activeElement === firstFocusableElement) {
+            event.preventDefault();
+            lastFocusableElement.focus();
+            return;
+        }
+
+        if (!event.shiftKey && activeElement === lastFocusableElement) {
+            event.preventDefault();
+            firstFocusableElement.focus();
+        }
+    }, [closeLocationSearchModal, getLocationSearchModalFocusableElements]);
+
+    const handleBuildingQueryChange = useCallback((value) => {
+        setBuildingQuery(value);
+        setShowBuildingSuggestions(true);
+
+        if (selectedBuilding && normalizeSearchText(value) !== normalizeSearchText(selectedBuilding.name)) {
+            setSelectedBuildingId("");
+            setSelectedRoomId("");
+            setRoomQuery("");
+        }
+    }, [selectedBuilding]);
+
+    const handleSelectBuilding = useCallback((building) => {
+        setSelectedBuildingId(building.id);
+        setBuildingQuery(building.name);
+        setSelectedRoomId("");
+        setRoomQuery("");
+        setShowBuildingSuggestions(false);
+        setShowRoomSuggestions(false);
+        clearRoute();
+        setError(null);
+    }, [clearRoute]);
+
+    const handleRoomQueryChange = useCallback((value) => {
+        setRoomQuery(value);
+        setShowRoomSuggestions(true);
+
+        if (selectedRoom && normalizeSearchText(value) !== normalizeSearchText(selectedRoom.name)) {
+            setSelectedRoomId("");
+        }
+    }, [selectedRoom]);
+
+    const handleSelectRoom = useCallback((room) => {
+        setSelectedRoomId(room.id);
+        setRoomQuery(room.name);
+        setShowRoomSuggestions(false);
+    }, []);
 
     const applyAdminLocation = useCallback((lng, lat, label) => {
         if (!isValidCoordinatePair(lng, lat)) {
@@ -248,18 +796,33 @@ export default function OutdoorMap({ onEnterBuilding }) {
     }, [applyAdminLocation]);
 
     const handleGetDirections = useCallback(async () => {
-        if (!userLocation) {
-            setError("Please set your starting location first.");
+        if (!selectedBuildingId) {
+            setError("Please choose a destination building.");
             return;
         }
+
+        if (!destinationEntrance) {
+            setError("Selected building does not have a mapped outdoor entrance yet.");
+            return;
+        }
+
         setLoading(true);
         setError(null);
         clearRoute();
 
         try {
+            let startCoords = userLocation;
+
+            if (!startCoords) {
+                startCoords = await resolveTypedStartLocation(addressInput);
+                if (!startCoords) {
+                    return;
+                }
+            }
+
             const result = await fetchOutdoorRoute({
-                start: { lng: userLocation[0], lat: userLocation[1] },
-                destination: { lng: UMASS_MEMORIAL.lng, lat: UMASS_MEMORIAL.lat },
+                start: { lng: startCoords[0], lat: startCoords[1] },
+                destination: { lng: destinationTarget.lng, lat: destinationTarget.lat },
             });
 
             if (!result?.route?.geometry) {
@@ -288,7 +851,16 @@ export default function OutdoorMap({ onEnterBuilding }) {
         } finally {
             setLoading(false);
         }
-    }, [userLocation, drawRoute, clearRoute]);
+    }, [
+        userLocation,
+        addressInput,
+        selectedBuildingId,
+        destinationEntrance,
+        destinationTarget,
+        drawRoute,
+        clearRoute,
+        resolveTypedStartLocation,
+    ]);
 
     return (
         <div className="outdoorWrapper">
@@ -301,30 +873,50 @@ export default function OutdoorMap({ onEnterBuilding }) {
                         <div className="locationInputRow">
                             <div className="locationInputWrap">
                                 <input
+                                    ref={startLocationInputRef}
                                     className="locationInput"
                                     type="text"
                                     placeholder="Enter your address…"
                                     value={addressInput}
                                     onChange={(e) => handleAddressChange(e.target.value)}
-                                    onFocus={() => setShowSuggestions(suggestions.length > 0)}
+                                    onFocus={() => setShowSuggestions(normalizeSearchText(addressInput).length >= 3)}
                                     onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                                    onKeyDown={handleStartLocationKeyDown}
                                 />
                                 {showSuggestions && (
                                     <ul className="suggestionsList">
-                                        {suggestions.map((f) => (
-                                            <li
-                                                key={f.id}
-                                                className="suggestionItem"
-                                                onMouseDown={() => handleSelectSuggestion(f)}
-                                            >
-                                                <span className="suggestionName">
-                                                    {f.text}
-                                                </span>
-                                                <span className="suggestionPlace">
-                                                    {f.place_name.split(",").slice(1).join(",").trim()}
-                                                </span>
+                                        {suggestions.length > 0 ? (
+                                            suggestions.map((f) => (
+                                                <li
+                                                    key={f.id}
+                                                    className="suggestionItem"
+                                                    onMouseDown={() => handleSelectSuggestion(f)}
+                                                >
+                                                    <span className="suggestionName">
+                                                        {f.text}
+                                                    </span>
+                                                    <span className="suggestionPlace">
+                                                        {f.place_name.split(",").slice(1).join(",").trim()}
+                                                    </span>
+                                                </li>
+                                            ))
+                                        ) : (
+                                            <li className="suggestionEmpty">
+                                                No Massachusetts matches yet. Press Enter to try the best place-name match.
                                             </li>
-                                        ))}
+                                        )}
+                                        {hasTypedStartLocation && (
+                                            <li className="suggestionMoreRow">
+                                                <button
+                                                    type="button"
+                                                    className="suggestionMoreBtn"
+                                                    onMouseDown={(event) => event.preventDefault()}
+                                                    onClick={handleOpenLocationSearchModal}
+                                                >
+                                                    View More Results
+                                                </button>
+                                            </li>
+                                        )}
                                     </ul>
                                 )}
                             </div>
@@ -338,19 +930,101 @@ export default function OutdoorMap({ onEnterBuilding }) {
                         </div>
                     </div>
 
+                    <div className="locationSection">
+                        <div className="locationLabel">Destination building</div>
+                        <div className="locationInputWrap">
+                            <input
+                                className="locationInput"
+                                type="text"
+                                placeholder={loadingDestinations ? "Loading buildings..." : "Search buildings..."}
+                                value={buildingQuery}
+                                disabled={loadingDestinations}
+                                onChange={(e) => handleBuildingQueryChange(e.target.value)}
+                                onFocus={() => setShowBuildingSuggestions(true)}
+                                onBlur={() => setTimeout(() => setShowBuildingSuggestions(false), 150)}
+                            />
+
+                            {showBuildingSuggestions && !loadingDestinations && (
+                                <ul className="suggestionsList">
+                                    {buildingSuggestions.length > 0 ? (
+                                        buildingSuggestions.map((building) => (
+                                            <li
+                                                key={building.id}
+                                                className="suggestionItem"
+                                                onMouseDown={() => handleSelectBuilding(building)}
+                                            >
+                                                <span className="suggestionName">{building.name}</span>
+                                                <span className="suggestionPlace">
+                                                    {building.code || "Building"}
+                                                    {building.description ? ` · ${building.description}` : ""}
+                                                </span>
+                                            </li>
+                                        ))
+                                    ) : (
+                                        <li className="suggestionEmpty">No building matches your search.</li>
+                                    )}
+                                </ul>
+                            )}
+                        </div>
+                    </div>
+
+                    {selectedBuildingId && (
+                        <div className="locationSection">
+                            <div className="locationLabel">Destination room (optional)</div>
+                            <div className="locationInputWrap">
+                                <input
+                                    className="locationInput"
+                                    type="text"
+                                    placeholder="Search rooms..."
+                                    value={roomQuery}
+                                    onChange={(e) => handleRoomQueryChange(e.target.value)}
+                                    onFocus={() => setShowRoomSuggestions(true)}
+                                    onBlur={() => setTimeout(() => setShowRoomSuggestions(false), 150)}
+                                />
+
+                                {showRoomSuggestions && (
+                                    <ul className="suggestionsList">
+                                        {roomSuggestions.length > 0 ? (
+                                            roomSuggestions.map((room) => (
+                                                <li
+                                                    key={room.id}
+                                                    className="suggestionItem"
+                                                    onMouseDown={() => handleSelectRoom(room)}
+                                                >
+                                                    <span className="suggestionName">{room.name}</span>
+                                                    <span className="suggestionPlace">
+                                                        {floorNameById.get(room.floorId) || room.floorId}
+                                                        {room.id ? ` · ${room.id}` : ""}
+                                                    </span>
+                                                </li>
+                                            ))
+                                        ) : (
+                                            <li className="suggestionEmpty">No room matches your search.</li>
+                                        )}
+                                    </ul>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
                     <div className="destRow">
                         <div className="destDot" />
                         <div className="destInfo">
-                            <div className="destName">{UMASS_MEMORIAL.label}</div>
-                            <div className="destAddress">{UMASS_MEMORIAL.address}</div>
+                            <div className="destName">{selectedBuilding?.name || "Choose a destination building"}</div>
+                            <div className="destAddress">
+                                {destinationEntrance
+                                    ? `${destinationEntrance.label} entrance`
+                                    : "No mapped entrance for selected building."}
+                                {selectedRoom ? ` · Room: ${selectedRoom.name}` : ""}
+                            </div>
                         </div>
                     </div>
 
                     {distanceToDestinationMeters !== null && (
                         <div className={`arrivalStatus${canEnterBuilding ? " arrivalStatusReady" : ""}`}>
                             {canEnterBuilding
-                                ? "You are at the hospital. Switch to indoor navigation when you are ready."
-                                : `${formatDistance(distanceToDestinationMeters)} from UMass Memorial.`}
+                                ? `You are at ${selectedBuilding?.name || destinationTarget.label}. Switch to indoor navigation when you are ready.`
+                                : `${formatDistance(distanceToDestinationMeters)} from ${selectedBuilding?.name || destinationTarget.label}.`}
                         </div>
                     )}
 
@@ -414,7 +1088,7 @@ export default function OutdoorMap({ onEnterBuilding }) {
                     <button
                         className={`directionsBtn${loading ? " directionsBtnLoading" : ""}`}
                         onClick={handleGetDirections}
-                        disabled={loading || !userLocation}
+                        disabled={loading || (!userLocation && !hasTypedStartLocation) || !selectedBuildingId || loadingDestinations}
                     >
                         {loading ? "Getting directions…" : "Get Walking Directions"}
                     </button>
@@ -479,7 +1153,14 @@ export default function OutdoorMap({ onEnterBuilding }) {
 
                 {canEnterBuilding && onEnterBuilding && (
                     <div className="enterBuildingWrap">
-                        <button className="enterBuildingBtn" onClick={onEnterBuilding}>
+                        <button
+                            className="enterBuildingBtn"
+                            onClick={() => onEnterBuilding({
+                                buildingId: selectedBuildingId,
+                                roomId: selectedRoomId || null,
+                                entranceId: destinationEntrance?.id || null,
+                            })}
+                        >
                             Enter Building — Switch to Indoor Map
                         </button>
                     </div>
@@ -487,6 +1168,81 @@ export default function OutdoorMap({ onEnterBuilding }) {
             </div>
 
             <div className="outdoorMapCanvas" ref={mapContainerRef} />
+
+            {showLocationSearchModal && (
+                <div
+                    className="locationModalBackdrop"
+                    onMouseDown={closeLocationSearchModal}
+                >
+                    <div
+                        ref={locationSearchModalRef}
+                        className="locationModal"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby={locationSearchModalTitleId}
+                        aria-describedby={locationSearchModalDescriptionId}
+                        tabIndex={-1}
+                        onKeyDown={handleLocationSearchModalKeyDown}
+                        onMouseDown={(event) => event.stopPropagation()}
+                    >
+                        <div className="locationModalHeader">
+                            <h2 id={locationSearchModalTitleId} className="locationModalTitle">
+                                More Location Results
+                            </h2>
+                            <button
+                                ref={locationSearchModalCloseButtonRef}
+                                type="button"
+                                className="locationModalCloseBtn"
+                                onClick={closeLocationSearchModal}
+                            >
+                                Close
+                            </button>
+                        </div>
+                        <div id={locationSearchModalDescriptionId} className="locationModalSubtitle">
+                            Showing up to {EXPANDED_GEOCODE_LIMIT} Massachusetts matches for "{addressInput.trim()}"
+                        </div>
+
+                        <div className="locationModalBody" aria-busy={expandedSuggestionsLoading}>
+                            {expandedSuggestionsLoading && (
+                                <div className="locationModalState" role="status">
+                                    Loading locations...
+                                </div>
+                            )}
+
+                            {!expandedSuggestionsLoading && expandedSuggestionsError && (
+                                <div className="locationModalState locationModalStateError" role="alert">
+                                    {expandedSuggestionsError}
+                                </div>
+                            )}
+
+                            {!expandedSuggestionsLoading && !expandedSuggestionsError && expandedSuggestions.length === 0 && (
+                                <div className="locationModalState" role="status">
+                                    No additional matches found. Try adding city or landmark details.
+                                </div>
+                            )}
+
+                            {!expandedSuggestionsLoading && !expandedSuggestionsError && expandedSuggestions.length > 0 && (
+                                <ul className="locationModalList">
+                                    {expandedSuggestions.map((feature) => (
+                                        <li key={feature.id}>
+                                            <button
+                                                type="button"
+                                                className="locationModalItem"
+                                                onClick={() => handleSelectExpandedSuggestion(feature)}
+                                            >
+                                                <span className="suggestionName">{feature.text}</span>
+                                                <span className="suggestionPlace">
+                                                    {feature.place_name.split(",").slice(1).join(",").trim()}
+                                                </span>
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

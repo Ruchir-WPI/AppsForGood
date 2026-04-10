@@ -18,6 +18,7 @@ class Graph {
     static fromData(data) {
         const graph = new Graph();
 
+        // Build parents first so child entities can validate references as they are added.
         (data.buildings || []).forEach((item) => graph.addBuilding(item));
         (data.floors || []).forEach((item) => graph.addFloor(item));
         (data.rooms || []).forEach((item) => graph.addRoom(item));
@@ -89,6 +90,7 @@ class Graph {
     }
 
     validateReferences() {
+        // Validate both sides of room/node links to catch partial seed data mistakes early.
         this.rooms.forEach((room) => {
             room.nodeIds.forEach((nodeId) => {
                 const node = this.#assertExists(this.nodes, nodeId, "Node", `Room ${room.id}.nodeIds`);
@@ -145,6 +147,7 @@ class Graph {
         this.getNode(nodeId);
         const neighbors = this.adjacency.get(nodeId) || [];
 
+        // Store adjacency lightly, then attach the richer edge/node records only when needed.
         return neighbors
             .map((neighbor) => ({
                 ...neighbor,

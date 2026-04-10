@@ -73,6 +73,7 @@ class RouteService {
 
         let best = null;
 
+        // Rooms can resolve to multiple graph nodes, so score every viable pair.
         for (const startNodeId of startCandidates) {
             for (const destinationNodeId of destinationCandidates) {
                 const pathResult = algorithm.compute({
@@ -124,6 +125,7 @@ class RouteService {
             throw new ValidationError("Route request must be an object.");
         }
 
+        // Accept the older flat node/room fields until every caller uses nested endpoints.
         const start =
             request.start ||
             this.#endpointFromLegacyFields({
@@ -188,6 +190,7 @@ class RouteService {
             if (room.nodeIds.length === 0) {
                 throw new ValidationError(`Room "${room.id}" has no linked nodes.`);
             }
+            // Rooms can expose multiple entrances, so routing starts from every linked node.
             nodeIds = room.nodeIds.map((id) => this.graph.getNode(id).id);
         }
 
@@ -213,6 +216,7 @@ class RouteService {
         }
 
         return (edge, fromNode, toNode) => {
+            // Exclude stairs-only paths and stair nodes when accessibility is required.
             if (edge.accessibility?.stairsOnly) {
                 return false;
             }
@@ -289,6 +293,7 @@ class RouteService {
         if (fromNode.floorId !== toNode.floorId) {
             const targetFloor = this.#formatFloorLabel(toNode.floorId);
 
+            // Floor transitions get more specific instructions when the connector type is known.
             if (fromNode.type === "stairs" || toNode.type === "stairs") {
                 return `Take stairs to ${targetFloor}.`;
             }

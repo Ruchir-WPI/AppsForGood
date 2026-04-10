@@ -13,6 +13,7 @@ function parseCoordinatePoint(value, fieldName) {
   let lng;
   let lat;
 
+  // Accept both frontend payload shapes: { lng, lat } and [lng, lat].
   if (Array.isArray(value)) {
     if (value.length < 2) {
       throw new ValidationError(`${fieldName} must contain [lng, lat].`);
@@ -36,7 +37,9 @@ function parseCoordinatePoint(value, fieldName) {
   return { lng, lat };
 }
 
+// AI acknowledgement: This logic was drafted with AI assistance and reviewed by the project author.
 function createIndoorMapPayload(campusData) {
+  // Clone nested sample data so API consumers cannot mutate the in-memory seed.
   return {
     buildings: campusData.buildings.map((building) => ({ ...building })),
     floors: campusData.floors.map((floor) => ({ ...floor })),
@@ -60,8 +63,10 @@ function createIndoorMapPayload(campusData) {
   };
 }
 
+// AI acknowledgement: This backend app composition for Mapbox-powered outdoor routing and sample-campus hybrid routing was drafted with AI assistance and reviewed by the project author.
 function createApp({ routeService = null, mapboxService = null, indoorUiRouteService = null } = {}) {
   const app = express();
+  // Allow tests to inject fakes while production falls back to the sample services.
   const resolvedMapboxService = mapboxService || new MapboxService();
   const resolvedRouteService =
     routeService ||
@@ -92,6 +97,7 @@ function createApp({ routeService = null, mapboxService = null, indoorUiRouteSer
     }
   }
 
+  // Keep the legacy and /api-prefixed route endpoints in sync.
   app.post("/route", computeRouteHandler);
   app.post("/api/route", computeRouteHandler);
 
@@ -106,6 +112,7 @@ function createApp({ routeService = null, mapboxService = null, indoorUiRouteSer
 
   app.post("/api/route/outdoor", async (req, res, next) => {
     try {
+      // Support both the current and older payload field names from the frontend.
       const startPoint = parseCoordinatePoint(req.body?.start ?? req.body?.origin, "start");
       const destinationPoint = parseCoordinatePoint(req.body?.destination ?? req.body?.end, "destination");
 
@@ -150,6 +157,20 @@ function createApp({ routeService = null, mapboxService = null, indoorUiRouteSer
       });
 
       res.json({ suggestions });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/geocode/resolve", async (req, res, next) => {
+    try {
+      const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
+      if (!query) {
+        throw new ValidationError('Query parameter "q" is required.');
+      }
+
+      const place = await resolvedMapboxService.geocodePlace(query);
+      res.json({ place });
     } catch (error) {
       next(error);
     }

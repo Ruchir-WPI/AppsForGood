@@ -4,12 +4,18 @@ import MapNavigation from "./MapNavigation.jsx";
 
 export default function App() {
     const [mode, setMode] = useState("outdoor");
+    const [indoorSelection, setIndoorSelection] = useState(null);
 
     return mode === "outdoor" ? (
-        <OutdoorMap onEnterBuilding={() => setMode("indoor")} />
+        <OutdoorMap
+            onEnterBuilding={(selection) => {
+                setIndoorSelection(selection || null);
+                setMode("indoor");
+            }}
+        />
     ) : (
         <div style={{ position: "relative", height: "100vh" }}>
-            <MapNavigation />
+            <MapNavigation initialSelection={indoorSelection} />
 
             <button
                 onClick={() => setMode("outdoor")}

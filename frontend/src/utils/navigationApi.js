@@ -106,3 +106,25 @@ export async function fetchGeocodeSuggestions(query, { limit = DEFAULT_GEOCODE_L
 
     return Array.isArray(payload?.suggestions) ? payload.suggestions : [];
 }
+
+export async function fetchGeocodePlace(query) {
+    const normalizedQuery = typeof query === "string" ? query.trim() : "";
+    if (normalizedQuery.length < MIN_GEOCODE_QUERY_LENGTH) {
+        throw new Error(`Please enter at least ${MIN_GEOCODE_QUERY_LENGTH} characters for your location.`);
+    }
+
+    const params = new URLSearchParams({
+        q: normalizedQuery,
+    });
+
+    const payload = await requestJson(`/geocode/resolve?${params.toString()}`, {
+        method: "GET",
+    });
+
+    const place = payload?.place;
+    if (!place?.location || typeof place.location.lng !== "number" || typeof place.location.lat !== "number") {
+        throw new Error("No matching Massachusetts location was found for that search.");
+    }
+
+    return place;
+}

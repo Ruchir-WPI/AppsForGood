@@ -1,6 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
+// AI acknowledgement: These hybrid routing tests covering Mapbox behavior against sample-campus data were drafted with AI assistance and reviewed by the project author.
 const { createSampleRouteService, sampleCampus } = require("../src/indoor-routing");
 const { RouteNotFoundError, UpstreamApiError } = require("../src/indoor-routing/utils/errors");
 const { HybridRouteService } = require("../src/routing/services/HybridRouteService");

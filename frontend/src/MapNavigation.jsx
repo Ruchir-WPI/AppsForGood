@@ -2,8 +2,12 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import "./MapNavigation.css";
 import { fetchIndoorGraphRoute, fetchIndoorMapData } from "./utils/navigationApi";
 import {
+    CORRIDOR_BASE_WIDTH,
+    CORRIDOR_CONNECTOR_WIDTH,
     EDGE_STYLE,
+    EDGE_VISUAL_INSET_RATIO,
     FLOOR_BG_COLORS,
+    INITIAL_MAP_ZOOM,
     INDOOR_ROUTING_ALGORITHM,
     MAX_MAP_ZOOM,
     MAP_PADDING,
@@ -11,6 +15,11 @@ import {
     MIN_MAP_ZOOM,
     PAN_OVERSCROLL_RATIO,
     NODE_TYPE_STYLES,
+    ROOM_BLOCK_LONG_SIZE,
+    ROOM_BLOCK_SHORT_SIZE,
+    ROOM_LABEL_FONT_SIZE,
+    ROOM_AREA_OPACITY,
+    SPECIAL_AREA_OPACITY,
     ZOOM_STEP,
 } from "./constants/mapNavigation";
 
@@ -88,6 +97,166 @@ function clampPanForZoom(pan, zoom, mapBounds) {
     };
 }
 
+function shortenSegment(fromPoint, toPoint, insetRatio = EDGE_VISUAL_INSET_RATIO) {
+    const dx = toPoint.x - fromPoint.x;
+    const dy = toPoint.y - fromPoint.y;
+    const distance = Math.hypot(dx, dy);
+
+    if (distance <= 0.0001) {
+        return {
+            x1: fromPoint.x,
+            y1: fromPoint.y,
+            x2: toPoint.x,
+            y2: toPoint.y,
+        };
+    }
+
+    const ratio = clampNumber(insetRatio, 0, 0.48);
+    const insetDistance = distance * ratio;
+    const unitX = dx / distance;
+    const unitY = dy / distance;
+
+    return {
+        x1: fromPoint.x + (unitX * insetDistance),
+        y1: fromPoint.y + (unitY * insetDistance),
+        x2: toPoint.x - (unitX * insetDistance),
+        y2: toPoint.y - (unitY * insetDistance),
+    };
+}
+
+function buildRoomArea(roomNode, anchorPoint) {
+    const defaultWidth = ROOM_BLOCK_SHORT_SIZE;
+    const defaultHeight = ROOM_BLOCK_SHORT_SIZE;
+
+    if (!anchorPoint) {
+        return {
+            x: roomNode.x - (defaultWidth / 2),
+            y: roomNode.y - (defaultHeight / 2),
+            width: defaultWidth,
+            height: defaultHeight,
+            rx: 3,
+            doorwayEdge: "bottom",
+        };
+    }
+
+    const dx = roomNode.x - anchorPoint.x;
+    const dy = roomNode.y - anchorPoint.y;
+
+    if (Math.abs(dy) >= Math.abs(dx)) {
+        const height = ROOM_BLOCK_LONG_SIZE;
+        const width = ROOM_BLOCK_SHORT_SIZE;
+        const y = dy < 0 ? roomNode.y - height + 3 : roomNode.y - 3;
+        return {
+            x: roomNode.x - (width / 2),
+            y,
+            width,
+            height,
+            rx: 3,
+            doorwayEdge: dy < 0 ? "bottom" : "top",
+        };
+    }
+
+    const width = ROOM_BLOCK_LONG_SIZE;
+    const height = ROOM_BLOCK_SHORT_SIZE;
+    const x = dx < 0 ? roomNode.x - width + 3 : roomNode.x - 3;
+    return {
+        x,
+        y: roomNode.y - (height / 2),
+        width,
+        height,
+        rx: 3,
+        doorwayEdge: dx < 0 ? "right" : "left",
+    };
+}
+
+function buildCorridorBlock(fromPoint, toPoint, width) {
+    const segment = shortenSegment(fromPoint, toPoint);
+    const dx = segment.x2 - segment.x1;
+    const dy = segment.y2 - segment.y1;
+    const horizontal = Math.abs(dx) >= Math.abs(dy);
+
+    if (horizontal) {
+        const x = Math.min(segment.x1, segment.x2);
+        const corridorWidth = Math.max(1.5, Math.abs(dx));
+        const y = ((segment.y1 + segment.y2) / 2) - (width / 2);
+        return {
+            segment,
+            x,
+            y,
+            width: corridorWidth,
+            height: width,
+            rx: Math.max(2, width * 0.25),
+        };
+    }
+
+    const y = Math.min(segment.y1, segment.y2);
+    const corridorHeight = Math.max(1.5, Math.abs(dy));
+    const x = ((segment.x1 + segment.x2) / 2) - (width / 2);
+    return {
+        segment,
+        x,
+        y,
+        width,
+        height: corridorHeight,
+        rx: Math.max(2, width * 0.25),
+    };
+}
+
+function createRoomLabelLines(roomName, fallbackId) {
+    const label = (roomName || fallbackId || "Room").trim();
+    const segments = label.split(" - ");
+
+    const truncate = (value, maxChars) => {
+        if (!value) {
+            return "";
+        }
+
+        if (value.length <= maxChars) {
+            return value;
+        }
+
+        return `${value.slice(0, maxChars - 1).trim()}...`;
+    };
+
+    if (segments.length >= 2) {
+        const roomId = truncate(segments[0], 12);
+        const department = truncate(segments.slice(1).join(" - "), 14);
+        return [roomId, department];
+    }
+
+    if (label.length > 18) {
+        return [truncate(label.slice(0, 18).trim(), 18), truncate(label.slice(18).trim(), 14)];
+    }
+
+    return [truncate(label, 14)];
+}
+
+function buildDoorGapSegment(box, doorwayEdge) {
+    const safeEdge = doorwayEdge || "bottom";
+
+    if (safeEdge === "top" || safeEdge === "bottom") {
+        const y = safeEdge === "top" ? box.y : box.y + box.height;
+        const halfGap = Math.min(8, box.width * 0.22);
+        const centerX = box.x + (box.width / 2);
+        return {
+            x1: centerX - halfGap,
+            y1: y,
+            x2: centerX + halfGap,
+            y2: y,
+        };
+    }
+
+    const x = safeEdge === "left" ? box.x : box.x + box.width;
+    const halfGap = Math.min(8, box.height * 0.22);
+    const centerY = box.y + (box.height / 2);
+    return {
+        x1: x,
+        y1: centerY - halfGap,
+        x2: x,
+        y2: centerY + halfGap,
+    };
+}
+
 function computeViewBox(nodes) {
     if (nodes.length === 0) {
         return {
@@ -137,7 +306,7 @@ function StepItem({ icon, iconClassName, title, subtitle }) {
     );
 }
 
-export default function MapNavigation() {
+export default function MapNavigation({ initialSelection = null }) {
     const [mapData, setMapData] = useState(null);
     const [selectedBuildingId, setSelectedBuildingId] = useState("");
     const [selectedFloorId, setSelectedFloorId] = useState("");
@@ -148,12 +317,14 @@ export default function MapNavigation() {
     const [loadingRoute, setLoadingRoute] = useState(false);
     const [error, setError] = useState(null);
     const [toast, setToast] = useState(null);
-    const [zoom, setZoom] = useState(1);
+    const [zoom, setZoom] = useState(INITIAL_MAP_ZOOM);
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [isPanning, setIsPanning] = useState(false);
     const mapAreaRef = useRef(null);
     const panStateRef = useRef(null);
     const toastTimer = useRef(null);
+    const initialBuildingAppliedRef = useRef(false);
+    const initialEndpointsAppliedRef = useRef(false);
 
     const showToast = useCallback((message) => {
         setToast(message);
@@ -162,6 +333,11 @@ export default function MapNavigation() {
     }, []);
 
     useEffect(() => () => clearTimeout(toastTimer.current), []);
+
+    useEffect(() => {
+        initialBuildingAppliedRef.current = false;
+        initialEndpointsAppliedRef.current = false;
+    }, [initialSelection]);
 
     useEffect(() => {
         let cancelled = false;
@@ -200,6 +376,20 @@ export default function MapNavigation() {
             cancelled = true;
         };
     }, []);
+
+    useEffect(() => {
+        const availableBuildings = Array.isArray(mapData?.buildings) ? mapData.buildings : [];
+
+        if (initialBuildingAppliedRef.current || loadingMap || availableBuildings.length === 0) {
+            return;
+        }
+
+        if (initialSelection?.buildingId && availableBuildings.some((building) => building.id === initialSelection.buildingId)) {
+            setSelectedBuildingId(initialSelection.buildingId);
+        }
+
+        initialBuildingAppliedRef.current = true;
+    }, [initialSelection, loadingMap, mapData]);
 
     const normalizedMapData = mapData || EMPTY_INDOOR_MAP;
     const { buildings, floors, rooms, nodes, edges, entrances, outdoorPoints } = normalizedMapData;
@@ -255,6 +445,22 @@ export default function MapNavigation() {
         () => edges.filter((edge) => floorNodeIds.has(edge.fromNodeId) && floorNodeIds.has(edge.toNodeId)),
         [edges, floorNodeIds],
     );
+
+    const floorAdjacency = useMemo(() => {
+        const adjacency = new Map();
+
+        floorEdges.forEach((edge) => {
+            const fromList = adjacency.get(edge.fromNodeId) || [];
+            fromList.push(edge.toNodeId);
+            adjacency.set(edge.fromNodeId, fromList);
+
+            const toList = adjacency.get(edge.toNodeId) || [];
+            toList.push(edge.fromNodeId);
+            adjacency.set(edge.toNodeId, toList);
+        });
+
+        return adjacency;
+    }, [floorEdges]);
 
     const entrancesForBuilding = useMemo(
         () => entrances
@@ -355,35 +561,6 @@ export default function MapNavigation() {
         return keys;
     }, [routeData]);
 
-    const routeNodeIds = useMemo(() => {
-        const ids = new Set();
-        if (!Array.isArray(routeData?.nodePath)) {
-            return ids;
-        }
-
-        routeData.nodePath.forEach((nodeId) => ids.add(nodeId));
-        return ids;
-    }, [routeData]);
-
-    const floorRouteNodeIds = useMemo(() => {
-        if (!Array.isArray(routeData?.nodePath)) {
-            return [];
-        }
-
-        return routeData.nodePath.filter((nodeId) => floorNodeIds.has(nodeId));
-    }, [routeData, floorNodeIds]);
-
-    const routePolyline = useMemo(
-        () => floorRouteNodeIds
-            .map((nodeId) => {
-                const point = projectedNodeMap.get(nodeId);
-                return point ? `${point.x},${point.y}` : null;
-            })
-            .filter(Boolean)
-            .join(" "),
-        [floorRouteNodeIds, projectedNodeMap],
-    );
-
     const routeFloors = useMemo(() => {
         if (!Array.isArray(routeData?.nodePath)) {
             return [];
@@ -401,6 +578,98 @@ export default function MapNavigation() {
             })
             .map((floorId) => floorMap.get(floorId)?.name || floorId);
     }, [routeData, nodeMap, floorMap]);
+
+    const roomAreas = useMemo(() => {
+        const roomStyle = getNodeStyle("room_entrance");
+
+        return floorNodes
+            .filter((node) => node.type === "room_entrance" && node.roomId)
+            .map((node) => {
+                const roomPoint = projectedNodeMap.get(node.id);
+                if (!roomPoint) {
+                    return null;
+                }
+
+                const neighborIds = floorAdjacency.get(node.id) || [];
+                const anchorNeighbor = neighborIds
+                    .map((neighborId) => nodeMap.get(neighborId))
+                    .find((neighborNode) => neighborNode && neighborNode.type !== "room_entrance") || null;
+                const anchorPoint = anchorNeighbor ? projectedNodeMap.get(anchorNeighbor.id) || null : null;
+                const box = buildRoomArea(roomPoint, anchorPoint);
+                const room = roomMap.get(node.roomId);
+                const labelLines = createRoomLabelLines(room?.name, node.roomId);
+
+                return {
+                    id: node.id,
+                    roomId: node.roomId,
+                    box,
+                    labelLines,
+                    fill: roomStyle.fill,
+                    stroke: roomStyle.stroke,
+                };
+            })
+            .filter(Boolean);
+    }, [floorNodes, floorAdjacency, nodeMap, projectedNodeMap, roomMap]);
+
+    const corridorBlocks = useMemo(() => {
+        const hallwayStyle = getNodeStyle("hallway");
+
+        return floorEdges
+            .map((edge) => {
+                const fromNode = nodeMap.get(edge.fromNodeId);
+                const toNode = nodeMap.get(edge.toNodeId);
+                const fromPoint = projectedNodeMap.get(edge.fromNodeId);
+                const toPoint = projectedNodeMap.get(edge.toNodeId);
+
+                if (!fromNode || !toNode || !fromPoint || !toPoint) {
+                    return null;
+                }
+
+                const isRoomConnector = fromNode.type === "room_entrance" || toNode.type === "room_entrance";
+                const blockWidth = isRoomConnector ? CORRIDOR_CONNECTOR_WIDTH : CORRIDOR_BASE_WIDTH;
+                const block = buildCorridorBlock(fromPoint, toPoint, blockWidth);
+                const isRouteEdge = routeSegmentKeys.has(segmentKey(edge.fromNodeId, edge.toNodeId));
+
+                return {
+                    id: edge.id,
+                    isRouteEdge,
+                    isRoomConnector,
+                    fill: hallwayStyle.fill,
+                    stroke: hallwayStyle.stroke,
+                    block,
+                };
+            })
+            .filter(Boolean);
+    }, [floorEdges, nodeMap, projectedNodeMap, routeSegmentKeys]);
+
+    const structuralNodeAreas = useMemo(
+        () => floorNodes
+            .filter((node) => node.type !== "room_entrance")
+            .map((node) => {
+                const point = projectedNodeMap.get(node.id);
+                if (!point) {
+                    return null;
+                }
+
+                const isSpecial = ["stairs", "elevator", "exit"].includes(node.type);
+                const style = isSpecial ? getNodeStyle(node.type) : getNodeStyle("hallway");
+                const size = isSpecial ? CORRIDOR_BASE_WIDTH + 10 : CORRIDOR_BASE_WIDTH + 2;
+                const label = isSpecial ? (node.type === "elevator" ? "Elev" : node.type === "stairs" ? "Stairs" : "Exit") : "";
+
+                return {
+                    id: node.id,
+                    x: point.x - (size / 2),
+                    y: point.y - (size / 2),
+                    size,
+                    fill: style.fill,
+                    stroke: style.stroke,
+                    isSpecial,
+                    label,
+                };
+            })
+            .filter(Boolean),
+        [floorNodes, projectedNodeMap],
+    );
 
     useEffect(() => {
         setPan((currentPan) => {
@@ -428,11 +697,6 @@ export default function MapNavigation() {
     }, [selectedBuildingId]);
 
     useEffect(() => {
-        setZoom(1);
-        setPan({ x: 0, y: 0 });
-    }, [selectedBuildingId, selectedFloorId]);
-
-    useEffect(() => {
         if (endpointValues.size === 0) {
             setFromEndpoint("");
             setToEndpoint("");
@@ -454,6 +718,45 @@ export default function MapNavigation() {
             setToEndpoint(safeTo);
         }
     }, [endpointValues, fromEndpoint, toEndpoint, entranceOptions, roomOptions]);
+
+    useEffect(() => {
+        if (initialEndpointsAppliedRef.current || !initialBuildingAppliedRef.current) {
+            return;
+        }
+
+        if (!initialSelection) {
+            initialEndpointsAppliedRef.current = true;
+            return;
+        }
+
+        if (initialSelection.buildingId && selectedBuildingId !== initialSelection.buildingId) {
+            return;
+        }
+
+        let hasAppliedSelection = false;
+
+        if (initialSelection.entranceId) {
+            const initialFrom = `entrance:${initialSelection.entranceId}`;
+            if (endpointValues.has(initialFrom)) {
+                setFromEndpoint(initialFrom);
+                hasAppliedSelection = true;
+            }
+        }
+
+        if (initialSelection.roomId) {
+            const initialTo = `room:${initialSelection.roomId}`;
+            if (endpointValues.has(initialTo)) {
+                setToEndpoint(initialTo);
+                hasAppliedSelection = true;
+            }
+        }
+
+        if (hasAppliedSelection) {
+            showToast("Indoor destination preselected");
+        }
+
+        initialEndpointsAppliedRef.current = true;
+    }, [initialSelection, selectedBuildingId, endpointValues, showToast]);
 
     const applyZoom = useCallback((nextZoom, anchor = { xRatio: 0.5, yRatio: 0.5 }) => {
         const safeZoom = clampNumber(nextZoom, MIN_MAP_ZOOM, MAX_MAP_ZOOM);
@@ -589,7 +892,7 @@ export default function MapNavigation() {
     }, []);
 
     const resetMapView = useCallback(() => {
-        setZoom(1);
+        setZoom(INITIAL_MAP_ZOOM);
         setPan({ x: 0, y: 0 });
     }, []);
 
@@ -648,6 +951,7 @@ export default function MapNavigation() {
     };
 
     const selectedFloor = floorMap.get(selectedFloorId) || null;
+    const floorColor = FLOOR_BG_COLORS[Math.max(0, floorIndex) % FLOOR_BG_COLORS.length];
     const routeStartPoint = routeData ? projectedNodeMap.get(routeData.selectedStartNodeId) : null;
     const routeEndPoint = routeData ? projectedNodeMap.get(routeData.selectedDestinationNodeId) : null;
 
@@ -844,7 +1148,7 @@ export default function MapNavigation() {
                 </div>
             </div>
 
-            <div className="mapArea">
+            <div className="mapArea" style={{ backgroundColor: floorColor }}>
                 <div
                     ref={mapAreaRef}
                     className={`mapPanViewport${isPanning ? " mapPanViewportPanning" : ""}`}
@@ -868,91 +1172,142 @@ export default function MapNavigation() {
                         y={mapBounds.y}
                         width={mapBounds.width}
                         height={mapBounds.height}
-                        fill={FLOOR_BG_COLORS[Math.max(0, floorIndex) % FLOOR_BG_COLORS.length]}
-                        stroke="#d8e1eb"
+                        fill={floorColor}
+                        stroke={floorColor}
                         strokeWidth={1.2}
                         rx={10}
                     />
 
-                    {floorEdges.map((edge) => {
-                        const fromNode = projectedNodeMap.get(edge.fromNodeId);
-                        const toNode = projectedNodeMap.get(edge.toNodeId);
-                        if (!fromNode || !toNode) {
-                            return null;
-                        }
-
-                        const isRouteEdge = routeSegmentKeys.has(segmentKey(edge.fromNodeId, edge.toNodeId));
-                        const stroke = isRouteEdge
-                            ? EDGE_STYLE.route
-                            : edge.accessibility?.stairsOnly
-                                ? EDGE_STYLE.stairs
-                                : edge.accessibility?.wheelchair
-                                    ? EDGE_STYLE.elevator
-                                    : EDGE_STYLE.base;
-
-                        return (
-                            <line
-                                key={edge.id}
-                                x1={fromNode.x}
-                                y1={fromNode.y}
-                                x2={toNode.x}
-                                y2={toNode.y}
-                                stroke={stroke}
-                                strokeWidth={isRouteEdge ? 4.8 : 3}
-                                strokeLinecap="round"
-                                opacity={isRouteEdge ? 0.95 : 0.8}
-                            />
-                        );
-                    })}
-
-                    {routePolyline && (
-                        <polyline
-                            points={routePolyline}
-                            fill="none"
-                            stroke={EDGE_STYLE.route}
-                            strokeWidth={5.2}
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeDasharray="8 5"
-                            opacity={0.9}
+                    {corridorBlocks.map((corridor) => (
+                        <rect
+                            key={`${corridor.id}-corridor`}
+                            x={corridor.block.x}
+                            y={corridor.block.y}
+                            width={corridor.block.width}
+                            height={corridor.block.height}
+                            rx={corridor.block.rx}
+                            fill={corridor.fill}
+                            fillOpacity={corridor.isRoomConnector ? 0.3 : 0.58}
+                            stroke={corridor.stroke}
+                            strokeOpacity={corridor.isRoomConnector ? 0.45 : 0.62}
+                            strokeWidth={corridor.isRoomConnector ? 0.9 : 1.3}
                         />
-                    )}
+                    ))}
 
-                    {floorNodes.map((node) => {
-                        const point = projectedNodeMap.get(node.id);
-                        if (!point) {
-                            return null;
-                        }
+                    {structuralNodeAreas.map((area) => (
+                        <g key={`${area.id}-node-area`}>
+                            <rect
+                                x={area.x}
+                                y={area.y}
+                                width={area.size}
+                                height={area.size}
+                                rx={4}
+                                fill={area.fill}
+                                fillOpacity={area.isSpecial ? SPECIAL_AREA_OPACITY + 0.16 : 0.6}
+                                stroke={area.stroke}
+                                strokeOpacity={0.82}
+                                strokeWidth={1.2}
+                            />
+                            {area.isSpecial && (
+                                <text
+                                    x={area.x + (area.size / 2)}
+                                    y={area.y + (area.size / 2) + 1.7}
+                                    fontSize="6.4"
+                                    fill="#1f2937"
+                                    fontFamily="sans-serif"
+                                    fontWeight="700"
+                                    textAnchor="middle"
+                                >
+                                    {area.label}
+                                </text>
+                            )}
+                        </g>
+                    ))}
 
-                        const style = getNodeStyle(node.type);
-                        const onRoute = routeNodeIds.has(node.id);
+                    {roomAreas.map((area) => {
+                        const centerX = area.box.x + (area.box.width / 2);
+                        const centerY = area.box.y + (area.box.height / 2);
+                        const maxTextWidth = Math.max(14, area.box.width - 7);
+                        const lineSpacing = Math.min(
+                            ROOM_LABEL_FONT_SIZE + 0.6,
+                            Math.max(ROOM_LABEL_FONT_SIZE, (area.box.height - 8) / Math.max(1, area.labelLines.length)),
+                        );
+                        const firstLineY = centerY - (((area.labelLines.length - 1) * lineSpacing) / 2);
+                        const doorway = buildDoorGapSegment(area.box, area.box.doorwayEdge);
 
                         return (
-                            <g key={node.id}>
-                                <circle
-                                    cx={point.x}
-                                    cy={point.y}
-                                    r={onRoute ? style.radius + 1.3 : style.radius}
-                                    fill={style.fill}
-                                    stroke={style.stroke}
-                                    strokeWidth={onRoute ? 2.2 : 1.6}
+                            <g key={`${area.id}-room-area`}>
+                                <rect
+                                    x={area.box.x}
+                                    y={area.box.y}
+                                    width={area.box.width}
+                                    height={area.box.height}
+                                    rx={area.box.rx}
+                                    fill={area.fill}
+                                    fillOpacity={ROOM_AREA_OPACITY + 0.14}
+                                    stroke={area.stroke}
+                                    strokeOpacity={0.9}
+                                    strokeWidth={1.6}
                                 />
 
-                                {(node.type === "room_entrance" || node.type === "exit" || node.type === "stairs" || node.type === "elevator") && (
+                                <line
+                                    x1={doorway.x1}
+                                    y1={doorway.y1}
+                                    x2={doorway.x2}
+                                    y2={doorway.y2}
+                                    stroke={floorColor}
+                                    strokeWidth={3.1}
+                                    strokeLinecap="round"
+                                />
+
+                                {area.labelLines.map((line, index) => (
                                     <text
-                                        x={point.x + 9}
-                                        y={point.y - 11}
-                                        fontSize="8"
-                                        fill="#1e293b"
+                                        key={`${area.id}-label-${index}`}
+                                        x={centerX}
+                                        y={firstLineY + (index * lineSpacing)}
+                                        fontSize={ROOM_LABEL_FONT_SIZE}
+                                        fill="#0f172a"
                                         fontFamily="sans-serif"
-                                        fontWeight="600"
+                                        fontWeight={index === 0 ? "700" : "600"}
+                                        textAnchor="middle"
+                                        dominantBaseline="middle"
+                                        textLength={line.length > 7 ? maxTextWidth : undefined}
+                                        lengthAdjust={line.length > 7 ? "spacingAndGlyphs" : undefined}
                                     >
-                                        {node.label}
+                                        {line}
                                     </text>
-                                )}
+                                ))}
                             </g>
                         );
                     })}
+
+                    {corridorBlocks
+                        .filter((corridor) => corridor.isRouteEdge)
+                        .map((corridor) => {
+                            const isHorizontal = corridor.block.width >= corridor.block.height;
+                            const x1 = isHorizontal ? corridor.block.x : corridor.block.x + (corridor.block.width / 2);
+                            const y1 = isHorizontal ? corridor.block.y + (corridor.block.height / 2) : corridor.block.y;
+                            const x2 = isHorizontal
+                                ? corridor.block.x + corridor.block.width
+                                : corridor.block.x + (corridor.block.width / 2);
+                            const y2 = isHorizontal
+                                ? corridor.block.y + (corridor.block.height / 2)
+                                : corridor.block.y + corridor.block.height;
+
+                            return (
+                                <line
+                                    key={`${corridor.id}-route-segment`}
+                                    x1={x1}
+                                    y1={y1}
+                                    x2={x2}
+                                    y2={y2}
+                                    stroke={EDGE_STYLE.route}
+                                    strokeWidth={corridor.isRoomConnector ? 3.5 : 5.3}
+                                    strokeLinecap="round"
+                                    opacity={0.9}
+                                />
+                            );
+                        })}
 
                     {floorEntrances.map(({ entrance, node }) => {
                         const point = projectedNodeMap.get(node.id);
@@ -975,7 +1330,7 @@ export default function MapNavigation() {
                                 <text
                                     x={point.x + 14}
                                     y={point.y + 18}
-                                    fontSize="7"
+                                    fontSize="9"
                                     fill="#065f46"
                                     fontFamily="sans-serif"
                                     fontWeight="700"

@@ -6,6 +6,7 @@ class InMemoryMapRepository {
     }
 
     loadGraph() {
+        // Return a fresh graph so callers never share mutable route state by accident.
         return Graph.fromData(this.seedData);
     }
 }
