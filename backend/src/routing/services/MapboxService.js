@@ -21,6 +21,7 @@ const MASSACHUSETTS_BBOX_PARAM = [
 const UMASS_MEMORIAL_PROXIMITY_PARAM = "-71.7654,42.2776";
 const MAPBOX_SEARCHBOX_RESULT_TYPES = "address,street,place,city,locality,neighborhood,poi";
 const MAPBOX_SEARCHBOX_MAX_LIMIT = 10;
+const MAPBOX_DIRECTIONS_PROFILES = new Set(["walking", "cycling", "driving"]);
 
 function round(value) {
     return Math.round(value * 100) / 100;
@@ -38,11 +39,12 @@ class MapboxService {
         this.accessToken = accessToken;
     }
 
-    async getWalkingRoute({ startLng, startLat, endLng, endLat }) {
+    async getRoute({ startLng, startLat, endLng, endLat, profile = "walking" }) {
         this.#assertCoordinate(startLng, "startLng");
         this.#assertCoordinate(startLat, "startLat");
         this.#assertCoordinate(endLng, "endLng");
         this.#assertCoordinate(endLat, "endLat");
+        const normalizedProfile = this.#normalizeDirectionsProfile(profile);
 
         if (typeof this.fetchImpl !== "function") {
             throw new ConfigError("Global fetch is unavailable. Use Node.js 18+ or provide fetchImpl.");
@@ -58,7 +60,7 @@ class MapboxService {
             steps: "true",
             access_token: accessToken,
         });
-        const url = `${this.directionsBaseUrl}/directions/v5/mapbox/walking/${coordinates}?${params.toString()}`;
+        const url = `${this.directionsBaseUrl}/directions/v5/mapbox/${normalizedProfile}/${coordinates}?${params.toString()}`;
 
         let response;
         try {
@@ -112,12 +114,22 @@ class MapboxService {
 
         return {
             provider: "mapbox",
-            profile: "walking",
+            profile: normalizedProfile,
             distanceMeters: round(route.distance || 0),
             durationSeconds: round(route.duration || 0),
             geometry: route.geometry || null,
             steps,
         };
+    }
+
+    async getWalkingRoute({ startLng, startLat, endLng, endLat }) {
+        return this.getRoute({
+            startLng,
+            startLat,
+            endLng,
+            endLat,
+            profile: "walking",
+        });
     }
 
     async geocodeSuggestions({ query, limit = 5 } = {}) {
@@ -230,8 +242,10 @@ class MapboxService {
 
             const properties = feature?.properties || {};
             const text = properties.name || properties.name_preferred || feature?.text || "";
+            const address = properties.address || "";
+            const placeContext = properties.place_formatted || "";
             const placeName = properties.full_address
-                || [properties.address, properties.place_formatted].filter(Boolean).join(", ")
+                || [address, placeContext].filter(Boolean).join(", ")
                 || feature?.place_name
                 || text;
             const fallbackKey = `${lng.toFixed(6)},${lat.toFixed(6)}:${placeName || text}`;
@@ -245,6 +259,8 @@ class MapboxService {
                 id: key,
                 text,
                 place_name: placeName,
+                address,
+                place_context: placeContext,
                 center: [lng, lat],
             });
         });
@@ -275,6 +291,21 @@ class MapboxService {
         }
 
         return limit;
+    }
+
+    #normalizeDirectionsProfile(profile) {
+        if (typeof profile !== "string" || profile.trim().length === 0) {
+            throw new ValidationError("Route mode must be a non-empty string.");
+        }
+
+        const normalized = profile.trim().toLowerCase();
+        if (!MAPBOX_DIRECTIONS_PROFILES.has(normalized)) {
+            throw new ValidationError(
+                `Route mode must be one of: ${Array.from(MAPBOX_DIRECTIONS_PROFILES).join(", ")}.`,
+            );
+        }
+
+        return normalized;
     }
 
     #assertCoordinate(value, fieldName) {

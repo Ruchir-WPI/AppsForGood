@@ -1,3 +1,4 @@
+/* AI acknowledgement: This outdoor map sidebar, suggestion UI, and navigation-panel styling was drafted with AI assistance and reviewed by the project author. */
 .outdoorWrapper {
     display: flex;
     height: 100vh;
@@ -131,6 +132,11 @@
     font-size: 13px;
     font-weight: 500;
     color: #222;
+}
+
+.suggestionAddress {
+    font-size: 11px;
+    color: #4b5563;
 }
 
 .suggestionPlace {

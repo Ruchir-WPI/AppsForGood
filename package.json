@@ -1,0 +1,14 @@
+{
+  "name": "appsforgood",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "setup-backend": "cd backend && npm install",
+    "setup-frontend": "cd frontend && npm install",
+    "setup-all": "npm run setup-backend && npm run setup-frontend",
+    "build-frontend": "cd frontend && npm run build",
+    "prepare-production": "npm run setup-all && npm run build-frontend",
+    "start-production": "cd backend && npm run start",
+    "test-backend": "cd backend && npm test"
+  }
+}

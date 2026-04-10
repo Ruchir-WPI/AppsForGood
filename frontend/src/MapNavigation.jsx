@@ -83,6 +83,31 @@ function clampNumber(value, min, max) {
     return Math.min(Math.max(value, min), max);
 }
 
+function formatIndoorDistance(distanceUnits) {
+    const feet = Math.max(0, Number(distanceUnits) || 0) * 3.281;
+    if (feet < 1000) {
+        return `${Math.round(feet)} ft`;
+    }
+
+    return `${(feet / 5280).toFixed(1)} mi`;
+}
+
+function estimateIndoorDuration(distanceUnits) {
+    const feet = Math.max(0, Number(distanceUnits) || 0) * 3.281;
+    const minutes = feet / 250;
+
+    if (minutes < 1) {
+        return "< 1 min";
+    }
+
+    if (minutes < 60) {
+        return `${Math.round(minutes)} min`;
+    }
+
+    const roundedMinutes = Math.round(minutes);
+    return `${Math.floor(roundedMinutes / 60)}h ${roundedMinutes % 60}m`;
+}
+
 function clampPanForZoom(pan, zoom, mapBounds) {
     const visibleWidth = mapBounds.width / zoom;
     const visibleHeight = mapBounds.height / zoom;
@@ -306,6 +331,7 @@ function StepItem({ icon, iconClassName, title, subtitle }) {
     );
 }
 
+// AI acknowledgement: This indoor navigation composition for floor-aware rendering, endpoint controls, and route visualization was drafted with AI assistance and reviewed by the project author.
 export default function MapNavigation({ initialSelection = null }) {
     const [mapData, setMapData] = useState(null);
     const [selectedBuildingId, setSelectedBuildingId] = useState("");
@@ -1070,16 +1096,16 @@ export default function MapNavigation({ initialSelection = null }) {
                     <div className="routeInfo">
                         <div className="routeMeta">
                             <div className="routeStat">
-                                <strong className="routeStatNum">{routeData.totalDistance}</strong>
-                                distance units
+                                <strong className="routeStatNum">{formatIndoorDistance(routeData.totalDistance)}</strong>
+                                estimated distance
+                            </div>
+                            <div className="routeStat">
+                                <strong className="routeStatNum">{estimateIndoorDuration(routeData.totalDistance)}</strong>
+                                est. walk time
                             </div>
                             <div className="routeStat">
                                 <strong className="routeStatNum">{routeData.steps.length}</strong>
-                                instructions
-                            </div>
-                            <div className="routeStat">
-                                <strong className="routeStatNum">{routeData.meta?.visitedNodeCount ?? 0}</strong>
-                                nodes visited
+                                directions
                             </div>
                             <div className="routeStat">
                                 <strong className="routeStatNum">{routeData.meta?.algorithm || "A*"}</strong>
@@ -1100,7 +1126,7 @@ export default function MapNavigation({ initialSelection = null }) {
                             icon="i"
                             iconClassName="iconInfo"
                             title="Select indoor start and destination"
-                            subtitle="Routes are generated from sampleCampus graph data"
+                            subtitle="Choose where you are and where you want to go"
                         />
                     ) : (
                         <>
@@ -1116,7 +1142,7 @@ export default function MapNavigation({ initialSelection = null }) {
                                     icon={index + 1}
                                     iconClassName="iconNav"
                                     title={step.instruction}
-                                    subtitle={`${step.distance} units on ${floorMap.get(step.toFloorId)?.name || step.toFloorId}`}
+                                    subtitle={`${formatIndoorDistance(step.distance)} on ${floorMap.get(step.toFloorId)?.name || step.toFloorId}`}
                                 />
                             ))}
                             <StepItem
@@ -1128,7 +1154,7 @@ export default function MapNavigation({ initialSelection = null }) {
                         </>
                     )}
 
-                    <div className="metaSection">
+                <div className="metaSection">
                         <div className="metaTitle">Entrances</div>
                         {entrancesForBuilding.map(({ entrance, node }) => (
                             <div key={entrance.id} className="metaLine">

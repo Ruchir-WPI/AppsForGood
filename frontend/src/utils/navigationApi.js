@@ -82,10 +82,10 @@ export async function fetchIndoorGraphRoute({ start, destination, buildingId = n
     });
 }
 
-export async function fetchOutdoorRoute({ start, destination }) {
+export async function fetchOutdoorRoute({ start, destination, mode = "walking" }) {
     return requestJson("/route/outdoor", {
         method: "POST",
-        body: JSON.stringify({ start, destination }),
+        body: JSON.stringify({ start, destination, mode }),
     });
 }
 
