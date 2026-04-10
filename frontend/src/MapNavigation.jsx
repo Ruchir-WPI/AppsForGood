@@ -8,6 +8,7 @@ import {
     EDGE_VISUAL_INSET_RATIO,
     FLOOR_BG_COLORS,
     INITIAL_MAP_ZOOM,
+    INDOOR_ROUTING_ALGORITHM,
     MAX_MAP_ZOOM,
     MAP_PADDING,
     MAP_SCALE,
@@ -927,6 +928,9 @@ export default function MapNavigation({ initialSelection = null }) {
                 start,
                 destination,
                 buildingId: selectedBuildingId,
+                options: {
+                    algorithm: INDOOR_ROUTING_ALGORITHM,
+                },
             });
 
             setRouteData(route);
@@ -994,6 +998,7 @@ export default function MapNavigation({ initialSelection = null }) {
                             <div className="routeDot routeDotStart" />
                             <select
                                 className="select"
+                                aria-label="Start point"
                                 value={fromEndpoint}
                                 disabled={loadingMap}
                                 onChange={(event) => {
@@ -1025,6 +1030,7 @@ export default function MapNavigation({ initialSelection = null }) {
                             <div className="routeDot routeDotEnd" />
                             <select
                                 className="select"
+                                aria-label="Destination"
                                 value={toEndpoint}
                                 disabled={loadingMap}
                                 onChange={(event) => {
@@ -1074,6 +1080,10 @@ export default function MapNavigation({ initialSelection = null }) {
                             <div className="routeStat">
                                 <strong className="routeStatNum">{routeData.meta?.visitedNodeCount ?? 0}</strong>
                                 nodes visited
+                            </div>
+                            <div className="routeStat">
+                                <strong className="routeStatNum">{routeData.meta?.algorithm || "A*"}</strong>
+                                algorithm
                             </div>
                         </div>
                         {routeFloors.length > 0 && (

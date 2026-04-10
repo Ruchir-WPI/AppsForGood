@@ -105,6 +105,25 @@ test("hybrid route from parking garage to room returns stitched outdoor and indo
     assert.ok(response.steps.length >= 3);
 });
 
+test("hybrid route forwards the selected indoor algorithm", async () => {
+    const service = createHybridService(
+        createEntranceAwareMapboxService({
+            "entrance-main": 220,
+            "entrance-north": 150,
+            "entrance-east": 180,
+        }),
+    );
+
+    const response = await service.computeRoute({
+        start: { parkingGarageId: "garage-east" },
+        destination: { roomId: "room-202" },
+        options: { algorithm: "dijkstra" },
+    });
+
+    assert.equal(response.legs[1].algorithm, "Dijkstra");
+    assert.equal(response.metadata.indoorAlgorithm, "Dijkstra");
+});
+
 test("wheelchairRequired excludes inaccessible entrances", async () => {
     const calls = [];
     const service = createHybridService(

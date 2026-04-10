@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import MapNavigation from "../MapNavigation.jsx";
+import { INDOOR_ROUTING_ALGORITHM } from "../constants/mapNavigation";
 import { fetchIndoorGraphRoute, fetchIndoorMapData } from "../utils/navigationApi";
 
 const indoorMapFixture = {
@@ -64,6 +65,7 @@ describe("MapNavigation", () => {
                 },
             ],
             meta: {
+                algorithm: "Dijkstra",
                 visitedNodeCount: 3,
             },
         });
@@ -74,7 +76,8 @@ describe("MapNavigation", () => {
 
         await waitFor(() => expect(routeButton).toBeEnabled());
 
-        const [, fromSelect, toSelect] = screen.getAllByRole("combobox");
+        const fromSelect = screen.getByRole("combobox", { name: /start point/i });
+        const toSelect = screen.getByRole("combobox", { name: /destination/i });
 
         await waitFor(() => {
             expect(fromSelect).toHaveValue("entrance:ent1");
@@ -88,6 +91,9 @@ describe("MapNavigation", () => {
                 start: { nodeId: "n1" },
                 destination: { roomId: "r2" },
                 buildingId: "b1",
+                options: {
+                    algorithm: INDOOR_ROUTING_ALGORITHM,
+                },
             });
         });
 
@@ -95,6 +101,49 @@ describe("MapNavigation", () => {
         expect(screen.getByText(/proceed down the hallway/i)).toBeInTheDocument();
         expect(screen.getByText(/take the stairs to floor 2/i)).toBeInTheDocument();
         expect(screen.getByText(/indoor route generated/i)).toBeInTheDocument();
+    });
+
+    it("uses the developer-configured algorithm for the indoor route request", async () => {
+        fetchIndoorGraphRoute.mockResolvedValue({
+            selectedStartNodeId: "n1",
+            selectedDestinationNodeId: "n3",
+            nodePath: ["n1", "n2", "n3"],
+            totalDistance: 18,
+            steps: [],
+            meta: {
+                algorithm: "Dijkstra",
+                visitedNodeCount: 3,
+            },
+        });
+
+        render(<MapNavigation />);
+
+        const routeButton = screen.getByRole("button", { name: /generate indoor route/i });
+
+        await waitFor(() => expect(routeButton).toBeEnabled());
+
+        const fromSelect = screen.getByRole("combobox", { name: /start point/i });
+        const toSelect = screen.getByRole("combobox", { name: /destination/i });
+
+        await waitFor(() => {
+            expect(fromSelect).toHaveValue("entrance:ent1");
+            expect(toSelect).toHaveValue("room:r2");
+        });
+
+        fireEvent.click(routeButton);
+
+        await waitFor(() => {
+            expect(fetchIndoorGraphRoute).toHaveBeenCalledWith({
+                start: { nodeId: "n1" },
+                destination: { roomId: "r2" },
+                buildingId: "b1",
+                options: {
+                    algorithm: INDOOR_ROUTING_ALGORITHM,
+                },
+            });
+        });
+
+        expect(screen.queryByLabelText(/algorithm/i)).not.toBeInTheDocument();
     });
 
     it("shows an error banner when route generation fails", async () => {
@@ -106,7 +155,8 @@ describe("MapNavigation", () => {
 
         await waitFor(() => expect(routeButton).toBeEnabled());
 
-        const [, fromSelect, toSelect] = screen.getAllByRole("combobox");
+        const fromSelect = screen.getByRole("combobox", { name: /start point/i });
+        const toSelect = screen.getByRole("combobox", { name: /destination/i });
 
         await waitFor(() => {
             expect(fromSelect).toHaveValue("entrance:ent1");

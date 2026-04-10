@@ -69,7 +69,11 @@ class HybridRouteService {
         this.#assertNoIndoorLocator(start, "start");
         const outdoorStart = this.#resolveOutdoorStart(start);
         const normalizedDestination = this.#normalizeHybridDestination(destination);
-        const wheelchairRequired = Boolean(request.options?.wheelchairRequired);
+        const requestOptions =
+            request.options && typeof request.options === "object" && !Array.isArray(request.options)
+                ? request.options
+                : {};
+        const wheelchairRequired = Boolean(requestOptions.wheelchairRequired);
 
         return {
             mode: "hybrid",
@@ -77,6 +81,7 @@ class HybridRouteService {
                 start: outdoorStart,
                 destination: normalizedDestination,
                 options: {
+                    ...requestOptions,
                     wheelchairRequired,
                 },
             },

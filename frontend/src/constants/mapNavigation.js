@@ -13,6 +13,7 @@ export const CORRIDOR_CONNECTOR_WIDTH = 8;
 export const ROOM_BLOCK_LONG_SIZE = 52;
 export const ROOM_BLOCK_SHORT_SIZE = 34;
 export const ROOM_LABEL_FONT_SIZE = 7.2;
+export const INDOOR_ROUTING_ALGORITHM = "dijkstra"; // "a_star" or "dijkstra"
 
 export const FLOOR_BG_COLORS = ["#eef5ff", "#eef8f1", "#fff4e8", "#f8f1ff"];
 

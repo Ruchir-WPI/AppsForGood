@@ -1,5 +1,27 @@
 const { aStar } = require("../algorithms/aStar");
+const { dijkstra } = require("../algorithms/dijkstra");
 const { ValidationError, RouteNotFoundError } = require("../utils/errors");
+
+const ALGORITHMS = {
+    a_star: {
+        label: "A*",
+        compute: ({ graph, startNodeId, goalNodeId, edgeFilter }) => aStar({
+            graph,
+            startNodeId,
+            goalNodeId,
+            edgeFilter,
+        }),
+    },
+    dijkstra: {
+        label: "Dijkstra",
+        compute: ({ graph, startNodeId, goalNodeId, edgeFilter }) => dijkstra({
+            graph,
+            startNodeId,
+            goalNodeId,
+            edgeFilter,
+        }),
+    },
+};
 
 class RouteService {
     constructor({ graph = null, mapRepository = null } = {}) {
@@ -47,13 +69,14 @@ class RouteService {
             "destination",
         );
         const edgeFilter = this.#buildEdgeFilter(normalized.options);
+        const algorithm = this.#resolveAlgorithm(normalized.options?.algorithm);
 
         let best = null;
 
         // Rooms can resolve to multiple graph nodes, so score every viable pair.
         for (const startNodeId of startCandidates) {
             for (const destinationNodeId of destinationCandidates) {
-                const pathResult = aStar({
+                const pathResult = algorithm.compute({
                     graph: this.graph,
                     startNodeId,
                     goalNodeId: destinationNodeId,
@@ -91,7 +114,7 @@ class RouteService {
             totalDistance: this.#round(best.totalDistance),
             steps,
             meta: {
-                algorithm: "A*",
+                algorithm: algorithm.label,
                 visitedNodeCount: best.visitedNodeCount,
             },
         };
@@ -204,6 +227,32 @@ class RouteService {
 
             return edge.accessibility?.wheelchair !== false;
         };
+    }
+
+    #resolveAlgorithm(algorithmValue) {
+        if (algorithmValue === undefined || algorithmValue === null || algorithmValue === "") {
+            return ALGORITHMS.a_star;
+        }
+
+        if (typeof algorithmValue !== "string") {
+            throw new ValidationError("options.algorithm must be a string.");
+        }
+
+        const normalized = algorithmValue.trim().toLowerCase();
+        const aliases = {
+            "a*": "a_star",
+            "a-star": "a_star",
+            astar: "a_star",
+            a_star: "a_star",
+            dijkstra: "dijkstra",
+        };
+        const resolvedKey = aliases[normalized];
+
+        if (!resolvedKey) {
+            throw new ValidationError('options.algorithm must be "a_star" or "dijkstra".');
+        }
+
+        return ALGORITHMS[resolvedKey];
     }
 
     #buildRouteSteps(pathNodeIds) {
