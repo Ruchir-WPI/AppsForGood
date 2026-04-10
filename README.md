@@ -14,16 +14,39 @@ The backend is a Node.js + Express service in `backend/`.
 
 ### Frontend Integration Endpoints
 
-- `GET /api/campus/buildings`
-  - Returns building metadata used by the indoor map UI.
-- `POST /api/route/indoor-ui`
-  - Request: `{ "from": "building-id", "to": "building-id" }`
-  - Response: `{ "steps": string[], "distanceFt": number, "walkMinutes": number, "waypoints": [{ "x": number, "y": number }] }`
+- `GET /api/campus/indoor-map`
+  - Returns the indoor map payload used by the current React UI:
+    - `buildings`
+    - `floors`
+    - `rooms`
+    - `nodes`
+    - `edges`
+    - `entrances`
+    - `outdoorPoints`
+- `POST /api/route`
+  - Used by the indoor map UI for graph-based indoor routing.
+  - `start` and `destination` each accept either `{ "nodeId": "..." }` or `{ "roomId": "..." }`
+  - Optional fields:
+    - `buildingId`
+    - `options` such as `{ "wheelchairRequired": true }`
+  - Response:
+    - indoor-only route payload for indoor requests
+    - hybrid route payload when `start` includes `coordinates` or `parkingGarageId`
 - `GET /api/geocode/suggestions?q=...&limit=5`
   - Returns backend-proxied address suggestions for outdoor search.
+- `GET /api/geocode/resolve?q=...`
+  - Resolves a typed Massachusetts place/address to a single coordinate result.
 - `POST /api/route/outdoor`
   - Request: `{ "start": { "lng": number, "lat": number }, "destination": { "lng": number, "lat": number } }`
   - Response: normalized walking route geometry and turn steps.
+- `GET /api/campus/buildings`
+  - Returns lightweight building metadata from the indoor UI preview service.
+  - Available in the backend, but not used by the current React app.
+- `POST /api/route/indoor-ui`
+  - Lightweight preview route service.
+  - Available in the backend, but not used by the current React app.
+  - Request: `{ "from": "building-id", "to": "building-id" }`
+  - Response: `{ "steps": string[], "distanceFt": number, "walkMinutes": number, "waypoints": [{ "x": number, "y": number }] }`
 
 ### Environment Variables
 
@@ -31,9 +54,12 @@ Set these in the repo-root `.env` (or your process environment):
 
 - `PORT` (optional, defaults to `3001`)
 - `MAPBOX_ACCESS_TOKEN` (required for hybrid/outdoor routing and geocode suggestions)
+- `VITE_MAPBOX_TOKEN` (required by the frontend `mapbox-gl` map)
 - `MAPBOX_DIRECTIONS_BASE_URL` (optional, defaults to `https://api.mapbox.com`)
 
-Frontend dev server proxy routes `/api/*` to `http://localhost:3001`, so frontend components can call backend endpoints directly during local development.
+If you are using one Mapbox token for both frontend and backend, set both `MAPBOX_ACCESS_TOKEN` and `VITE_MAPBOX_TOKEN` to the same value.
+
+Frontend dev server proxy routes `/api/*` to `http://localhost:3001`, so frontend components can call backend endpoints directly during local development. The Vite config reads env vars from the repo root.
 
 ### Hybrid Route Request Example
 
@@ -65,7 +91,7 @@ The response includes:
 
 Outdoor routing uses Mapbox pedestrian walking directions. Indoor accessibility constraints are enforced through the internal graph and wheelchair-accessible entrance filtering.
 
-### Running Tests
+### Running Checks
 
 From `backend/`:
 
@@ -76,6 +102,7 @@ npm test
 From `frontend/`:
 
 ```bash
+npm test
 npm run lint
 npm run build
 ```
