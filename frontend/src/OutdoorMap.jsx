@@ -228,6 +228,7 @@ function isWithinCampusBounds(lng, lat) {
     ) <= DESTINATION_COORD_MAX_DISTANCE_METERS;
 }
 
+// AI acknowledgement: This outdoor map flow for geocoded start input, destination handoff, and transport-mode routing was drafted with AI assistance and reviewed by the project author.
 export default function OutdoorMap({ onEnterBuilding }) {
     const mapContainerRef = useRef(null);
     const mapRef = useRef(null);

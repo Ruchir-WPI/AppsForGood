@@ -2,6 +2,7 @@ import { useState } from "react";
 import OutdoorMap from "./OutdoorMap.jsx";
 import MapNavigation from "./MapNavigation.jsx";
 
+// AI acknowledgement: This top-level mode switch that carries outdoor destination context into indoor navigation was drafted with AI assistance and reviewed by the project author.
 export default function App() {
     const [mode, setMode] = useState("outdoor");
     const [indoorSelection, setIndoorSelection] = useState(null);
