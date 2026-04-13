@@ -44,6 +44,17 @@ function transportVerb(mode) {
     return "walk";
 }
 
+function formatEntranceLabel(label) {
+    const normalizedLabel = typeof label === "string" ? label.trim() : "";
+    if (!normalizedLabel) {
+        return "Entrance";
+    }
+
+    return /entrance$/i.test(normalizedLabel)
+        ? normalizedLabel
+        : `${normalizedLabel} entrance`;
+}
+
 function isValidCoordinatePair(lng, lat) {
     return Number.isFinite(lng)
         && Number.isFinite(lat)
@@ -1097,20 +1108,19 @@ export default function OutdoorNavigation({ onEnterBuilding }) {
     </select>
 </div>
 
-<div className="destinationCard">
-    <div className="destRow">
-        <div className="destDot" />
-        <div className="destInfo">
-            <div className="destName">{selectedBuilding?.name || "Choose a destination building"}</div>
-            <div className="destAddress">
-                {destinationEntrance
-                    ? `${destinationEntrance.label} entrance`
-                    : "No mapped entrance for selected building."}
-                {selectedRoom ? ` · Room: ${selectedRoom.name}` : ""}
-            </div>
-        </div>
-    </div>
-</div>
+                        <div className="destinationCard">
+                            <div className="destRow">
+                                <div className="destDot" />
+                                <div className="destInfo">
+                                    <div className="destName">{selectedBuilding?.name || "Choose a destination building"}</div>
+                                    <div className="destAddress">
+                                        {destinationEntrance
+                                            ? formatEntranceLabel(destinationEntrance.label)
+                                            : "No mapped entrance for selected building."}
+                                        {selectedRoom ? ` · Room: ${selectedRoom.name}` : ""}
+                                    </div>
+                                </div>
+                            </div>
 
                             {distanceToDestinationMeters !== null && (
                                 <div className={`arrivalStatus${canEnterBuilding ? " arrivalStatusReady" : ""}`}>
@@ -1283,7 +1293,7 @@ export default function OutdoorNavigation({ onEnterBuilding }) {
                             : "Walking directions and entrance context appear here once you plan your route."}
                     </div>
                 </div>
-                <div className="outdoorNavigationCanvas" ref={mapContainerRef} />
+                <div className="outdoorMapCanvas" ref={mapContainerRef} />
             </div>
 
             {showLocationSearchModal && (
