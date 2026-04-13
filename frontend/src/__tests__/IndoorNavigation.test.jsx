@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import MapNavigation from "../MapNavigation.jsx";
-import { INDOOR_ROUTING_ALGORITHM } from "../constants/mapNavigation";
+import IndoorNavigation from "../IndoorNavigation.jsx";
+import { INDOOR_ROUTING_ALGORITHM } from "../constants/indoorNavigation";
 import { fetchIndoorGraphRoute, fetchIndoorMapData } from "../utils/navigationApi";
 
 const indoorMapFixture = {
@@ -38,7 +38,7 @@ vi.mock("../utils/navigationApi", () => ({
     fetchIndoorGraphRoute: vi.fn(),
 }));
 
-describe("MapNavigation", () => {
+describe("IndoorNavigation", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         fetchIndoorMapData.mockResolvedValue(indoorMapFixture);
@@ -70,7 +70,7 @@ describe("MapNavigation", () => {
             },
         });
 
-        render(<MapNavigation />);
+        render(<IndoorNavigation />);
 
         const routeButton = screen.getByRole("button", { name: /generate indoor route/i });
 
@@ -116,7 +116,7 @@ describe("MapNavigation", () => {
             },
         });
 
-        render(<MapNavigation />);
+        render(<IndoorNavigation />);
 
         const routeButton = screen.getByRole("button", { name: /generate indoor route/i });
 
@@ -149,7 +149,7 @@ describe("MapNavigation", () => {
     it("shows an error banner when route generation fails", async () => {
         fetchIndoorGraphRoute.mockRejectedValue(new Error("Route service unavailable"));
 
-        render(<MapNavigation />);
+        render(<IndoorNavigation />);
 
         const routeButton = screen.getByRole("button", { name: /generate indoor route/i });
 

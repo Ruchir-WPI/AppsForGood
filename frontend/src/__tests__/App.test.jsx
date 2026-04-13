@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import App from "../App.jsx";
 
-vi.mock("../OutdoorMap.jsx", () => ({
+vi.mock("../OutdoorNavigation.jsx", () => ({
     default: ({ onEnterBuilding }) => (
         <button type="button" onClick={onEnterBuilding}>
             Open indoor navigation
@@ -10,7 +10,7 @@ vi.mock("../OutdoorMap.jsx", () => ({
     ),
 }));
 
-vi.mock("../MapNavigation.jsx", () => ({
+vi.mock("../IndoorNavigation.jsx", () => ({
     default: () => <div>Indoor map content</div>,
 }));
 

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import OutdoorMap from "../OutdoorMap.jsx";
-import { UMASS_MEMORIAL } from "../constants/outdoorMap";
+import OutdoorNavigation from "../OutdoorNavigation.jsx";
+import { UMASS_MEMORIAL } from "../constants/outdoorNavigation";
 import {
     fetchGeocodePlace,
     fetchGeocodeSuggestions,
@@ -74,7 +74,7 @@ vi.mock("../utils/navigationApi", () => ({
     fetchOutdoorRoute: vi.fn(),
 }));
 
-describe("OutdoorMap", () => {
+describe("OutdoorNavigation", () => {
     const indoorMapFixture = {
         buildings: [
             { id: "hospital", name: "Hospital" },
@@ -120,7 +120,7 @@ describe("OutdoorMap", () => {
     it("shows the indoor handoff CTA when the user is at the hospital", async () => {
         const onEnterBuilding = vi.fn();
 
-        render(<OutdoorMap onEnterBuilding={onEnterBuilding} />);
+        render(<OutdoorNavigation onEnterBuilding={onEnterBuilding} />);
 
         await waitFor(() => {
             expect(screen.getByDisplayValue("Hospital")).toBeInTheDocument();
@@ -164,7 +164,7 @@ describe("OutdoorMap", () => {
             ],
         });
 
-        render(<OutdoorMap onEnterBuilding={() => {}} />);
+        render(<OutdoorNavigation onEnterBuilding={() => {}} />);
 
         await waitFor(() => {
             expect(screen.getByDisplayValue("Hospital")).toBeInTheDocument();
@@ -173,7 +173,7 @@ describe("OutdoorMap", () => {
         fireEvent.click(screen.getByRole("button", { name: /show admin location tools/i }));
         fireEvent.click(screen.getByRole("button", { name: /downtown worcester/i }));
 
-        const getDirectionsButton = screen.getByRole("button", { name: /get walking directions/i });
+        const getDirectionsButton = screen.getByRole("button", { name: /get directions/i });
         await waitFor(() => {
             expect(getDirectionsButton).toBeEnabled();
         });
@@ -184,6 +184,7 @@ describe("OutdoorMap", () => {
             expect(fetchOutdoorRoute).toHaveBeenCalledWith({
                 start: { lng: -71.8017, lat: 42.2626 },
                 destination: { lng: UMASS_MEMORIAL.lng, lat: UMASS_MEMORIAL.lat },
+                mode: "walking",
             });
         });
 
@@ -210,7 +211,7 @@ describe("OutdoorMap", () => {
                 },
             ]);
 
-        render(<OutdoorMap onEnterBuilding={() => {}} />);
+        render(<OutdoorNavigation onEnterBuilding={() => {}} />);
 
         const startLocationInput = screen.getByPlaceholderText(/enter your address/i);
 
