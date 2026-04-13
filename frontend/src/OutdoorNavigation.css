@@ -1,3 +1,4 @@
+/* AI acknowledgement: This outdoor map sidebar, suggestion UI, and navigation-panel styling was drafted with AI assistance and reviewed by the project author. */
 .outdoorWrapper {
     display: grid;
     grid-template-columns: minmax(340px, 430px) minmax(0, 1fr);
@@ -231,10 +232,20 @@
     color: var(--ink);
 }
 
-.outdoorWrapper .suggestionPlace,
+.suggestionAddress {
+    font-size: 11px;
+    color: #4b5563;
+}
+
+.suggestionPlace {
+    font-size: 0.83rem;
+    color: var(--muted);
+}
+
 .locationModal .suggestionPlace {
     font-size: 0.83rem;
     color: var(--muted);
+}
 }
 
 .outdoorWrapper .geoBtn {
@@ -727,14 +738,20 @@
     transition: background-color 150ms ease;
 }
 
-.locationModalCloseBtn:focus-visible,
-.locationModalItem:focus-visible,
 .outdoorWrapper .directionsBtn:focus-visible,
 .outdoorWrapper .enterBuildingBtn:focus-visible,
 .outdoorWrapper .geoBtn:focus-visible,
-.outdoorWrapper .adminToggleBtn:focus-visible {
+.outdoorWrapper .adminToggleBtn:focus-visible,
+.locationModalCloseBtn:focus-visible,
+.locationModalItem:focus-visible {
     outline: 2px solid rgba(154, 122, 67, 0.48);
     outline-offset: 3px;
+}
+
+.outdoorMapCanvas {
+    flex: 1;
+    position: relative;
+}
 }
 
 .markerDest {

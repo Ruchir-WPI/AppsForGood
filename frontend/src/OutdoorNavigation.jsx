@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo, useId } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
-import "./OutdoorMap.css";
+import "./OutdoorNavigation.css";
 import {
     fetchGeocodePlace,
     fetchGeocodeSuggestions,
@@ -11,9 +11,10 @@ import {
 import {
     ARRIVAL_PROMPT_DISTANCE_METERS,
     DESTINATION_COORD_MAX_DISTANCE_METERS,
+    OUTDOOR_TRANSPORT_MODES,
     TEST_LOCATION_PRESETS,
     UMASS_MEMORIAL,
-} from "./constants/outdoorMap";
+} from "./constants/outdoorNavigation";
 import { EXPANDED_GEOCODE_LIMIT } from "./constants/api";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
@@ -29,6 +30,18 @@ function formatDuration(seconds) {
     if (seconds < 60) return `${Math.round(seconds)} sec`;
     const mins = Math.round(seconds / 60);
     return mins < 60 ? `${mins} min` : `${Math.floor(mins / 60)}h ${mins % 60}m`;
+}
+
+function transportVerb(mode) {
+    if (mode === "driving") {
+        return "drive";
+    }
+
+    if (mode === "cycling") {
+        return "ride";
+    }
+
+    return "walk";
 }
 
 function isValidCoordinatePair(lng, lat) {
@@ -58,6 +71,43 @@ function distanceBetweenMeters(from, to) {
 
 function normalizeSearchText(value) {
     return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+function getSuggestionAddressLine(feature) {
+    const explicitAddress = typeof feature?.address === "string" ? feature.address.trim() : "";
+    if (explicitAddress) {
+        return explicitAddress;
+    }
+
+    const placeName = typeof feature?.place_name === "string" ? feature.place_name : "";
+    const firstSegment = placeName.split(",")[0]?.trim() || "";
+    if (!firstSegment) {
+        return "";
+    }
+
+    if (normalizeSearchText(firstSegment) === normalizeSearchText(feature?.text || "")) {
+        return "";
+    }
+
+    return firstSegment;
+}
+
+function getSuggestionContextLine(feature) {
+    const explicitContext = typeof feature?.place_context === "string" ? feature.place_context.trim() : "";
+    if (explicitContext) {
+        return explicitContext;
+    }
+
+    const placeName = typeof feature?.place_name === "string" ? feature.place_name : "";
+    const segments = placeName
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean);
+    if (segments.length <= 1) {
+        return "";
+    }
+
+    return segments.slice(1).join(", ");
 }
 
 function fuzzyScore(query, target) {
@@ -178,7 +228,8 @@ function isWithinCampusBounds(lng, lat) {
     ) <= DESTINATION_COORD_MAX_DISTANCE_METERS;
 }
 
-export default function OutdoorMap({ onEnterBuilding }) {
+// AI acknowledgement: This outdoor map flow for geocoded start input, destination handoff, and transport-mode routing was drafted with AI assistance and reviewed by the project author.
+export default function OutdoorNavigation({ onEnterBuilding }) {
     const mapContainerRef = useRef(null);
     const mapRef = useRef(null);
     const mapLoadedRef = useRef(false);
@@ -202,6 +253,7 @@ export default function OutdoorMap({ onEnterBuilding }) {
     const [activeStep, setActiveStep] = useState(0);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [transportMode, setTransportMode] = useState("walking");
     const [geoStatus, setGeoStatus] = useState("idle");
     const [showAdminTools, setShowAdminTools] = useState(false);
     const [adminLngInput, setAdminLngInput] = useState(String(UMASS_MEMORIAL.lng));
@@ -823,6 +875,7 @@ export default function OutdoorMap({ onEnterBuilding }) {
             const result = await fetchOutdoorRoute({
                 start: { lng: startCoords[0], lat: startCoords[1] },
                 destination: { lng: destinationTarget.lng, lat: destinationTarget.lat },
+                mode: transportMode,
             });
 
             if (!result?.route?.geometry) {
@@ -835,6 +888,7 @@ export default function OutdoorMap({ onEnterBuilding }) {
             setRouteInfo({
                 distanceM: route.distanceMeters,
                 durationS: route.durationSeconds,
+                profile: route.profile || transportMode,
             });
             setSteps(routeSteps);
             setActiveStep(0);
@@ -857,6 +911,7 @@ export default function OutdoorMap({ onEnterBuilding }) {
         selectedBuildingId,
         destinationEntrance,
         destinationTarget,
+        transportMode,
         drawRoute,
         clearRoute,
         resolveTypedStartLocation,
@@ -910,9 +965,14 @@ export default function OutdoorMap({ onEnterBuilding }) {
                                                         <span className="suggestionName">
                                                             {f.text}
                                                         </span>
-                                                        <span className="suggestionPlace">
-                                                            {f.place_name.split(",").slice(1).join(",").trim()}
+                                                        {getSuggestionAddressLine(f) && (
+                                                        <span className="suggestionAddress">
+                                                            {getSuggestionAddressLine(f)}
                                                         </span>
+                                                    )}
+                                                    {getSuggestionContextLine(f) && (<span className="suggestionPlace">
+                                                            {getSuggestionContextLine(f)}
+                                                        </span>)}
                                                     </li>
                                                 ))
                                             ) : (
@@ -1022,19 +1082,35 @@ export default function OutdoorMap({ onEnterBuilding }) {
                             </div>
                         )}
 
-                        <div className="destinationCard">
-                            <div className="destRow">
-                                <div className="destDot" />
-                                <div className="destInfo">
-                                    <div className="destName">{selectedBuilding?.name || "Choose a destination building"}</div>
-                                    <div className="destAddress">
-                                        {destinationEntrance
-                                            ? `${destinationEntrance.label} entrance`
-                                            : "No mapped entrance for selected building."}
-                                        {selectedRoom ? ` · Room: ${selectedRoom.name}` : ""}
-                                    </div>
-                                </div>
-                            </div>
+<div className="locationSection">
+    <div className="locationLabel">Transportation mode</div>
+    <select
+        className="locationInput"
+        value={transportMode}
+        onChange={(event) => setTransportMode(event.target.value)}
+    >
+        {OUTDOOR_TRANSPORT_MODES.map((modeOption) => (
+            <option key={modeOption.value} value={modeOption.value}>
+                {modeOption.label}
+            </option>
+        ))}
+    </select>
+</div>
+
+<div className="destinationCard">
+    <div className="destRow">
+        <div className="destDot" />
+        <div className="destInfo">
+            <div className="destName">{selectedBuilding?.name || "Choose a destination building"}</div>
+            <div className="destAddress">
+                {destinationEntrance
+                    ? `${destinationEntrance.label} entrance`
+                    : "No mapped entrance for selected building."}
+                {selectedRoom ? ` · Room: ${selectedRoom.name}` : ""}
+            </div>
+        </div>
+    </div>
+</div>
 
                             {distanceToDestinationMeters !== null && (
                                 <div className={`arrivalStatus${canEnterBuilding ? " arrivalStatusReady" : ""}`}>
@@ -1107,7 +1183,7 @@ export default function OutdoorMap({ onEnterBuilding }) {
                             onClick={handleGetDirections}
                             disabled={loading || (!userLocation && !hasTypedStartLocation) || !selectedBuildingId || loadingDestinations}
                         >
-                            {loading ? "Getting directions…" : "Get Walking Directions"}
+                            {loading ? "Getting directions…" : "Get Directions"}
                         </button>
 
                         {error && <div className="errorBanner">{error}</div>}
@@ -1123,7 +1199,7 @@ export default function OutdoorMap({ onEnterBuilding }) {
                                     <strong className="routeStatNum">
                                         {formatDuration(routeInfo.durationS)}
                                     </strong>
-                                    walk
+                                    {transportVerb(routeInfo.profile)}
                                 </div>
                                 <div className="routeStat">
                                     <strong className="routeStatNum">
@@ -1207,7 +1283,7 @@ export default function OutdoorMap({ onEnterBuilding }) {
                             : "Walking directions and entrance context appear here once you plan your route."}
                     </div>
                 </div>
-                <div className="outdoorMapCanvas" ref={mapContainerRef} />
+                <div className="outdoorNavigationCanvas" ref={mapContainerRef} />
             </div>
 
             {showLocationSearchModal && (
@@ -1272,9 +1348,16 @@ export default function OutdoorMap({ onEnterBuilding }) {
                                                 onClick={() => handleSelectExpandedSuggestion(feature)}
                                             >
                                                 <span className="suggestionName">{feature.text}</span>
-                                                <span className="suggestionPlace">
-                                                    {feature.place_name.split(",").slice(1).join(",").trim()}
-                                                </span>
+                                                {getSuggestionAddressLine(feature) && (
+                                                    <span className="suggestionAddress">
+                                                        {getSuggestionAddressLine(feature)}
+                                                    </span>
+                                                )}
+                                                {getSuggestionContextLine(feature) && (
+                                                    <span className="suggestionPlace">
+                                                        {getSuggestionContextLine(feature)}
+                                                    </span>
+                                                )}
                                             </button>
                                         </li>
                                     ))}

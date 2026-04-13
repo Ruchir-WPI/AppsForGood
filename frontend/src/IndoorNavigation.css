@@ -1,3 +1,4 @@
+/* AI acknowledgement: This indoor panel, floor-map layout, and route-visual styling system was drafted with AI assistance and reviewed by the project author. */
 .wrapper {
     display: grid;
     grid-template-columns: minmax(340px, 430px) minmax(0, 1fr);

@@ -1,4 +1,5 @@
 const path = require("node:path");
+const fs = require("node:fs");
 require("dotenv").config({
   path: process.env.ENV_FILE || path.resolve(__dirname, "..", ".env"),
 });
@@ -8,6 +9,9 @@ const { createSampleRouteService, sampleCampus } = require("./src/indoor-routing
 const { IndoorUiRouteService } = require("./src/api");
 const { MapboxService, HybridRouteService } = require("./src/routing");
 const { AppError, ValidationError } = require("./src/indoor-routing/utils/errors");
+
+const FRONTEND_DIST_PATH = path.resolve(__dirname, "..", "frontend", "dist");
+const FRONTEND_INDEX_PATH = path.join(FRONTEND_DIST_PATH, "index.html");
 
 function parseCoordinatePoint(value, fieldName) {
   let lng;
@@ -63,6 +67,18 @@ function createIndoorMapPayload(campusData) {
   };
 }
 
+function registerFrontendStaticHosting(app) {
+  if (!fs.existsSync(FRONTEND_INDEX_PATH)) {
+    return;
+  }
+
+  app.use(express.static(FRONTEND_DIST_PATH));
+
+  app.get(/^\/(?!api(?:\/|$)).*/, (_req, res) => {
+    res.sendFile(FRONTEND_INDEX_PATH);
+  });
+}
+
 // AI acknowledgement: This backend app composition for Mapbox-powered outdoor routing and sample-campus hybrid routing was drafted with AI assistance and reviewed by the project author.
 function createApp({ routeService = null, mapboxService = null, indoorUiRouteService = null } = {}) {
   const app = express();
@@ -115,13 +131,25 @@ function createApp({ routeService = null, mapboxService = null, indoorUiRouteSer
       // Support both the current and older payload field names from the frontend.
       const startPoint = parseCoordinatePoint(req.body?.start ?? req.body?.origin, "start");
       const destinationPoint = parseCoordinatePoint(req.body?.destination ?? req.body?.end, "destination");
+      const requestedMode = req.body?.mode ?? req.body?.profile ?? "walking";
 
-      const route = await resolvedMapboxService.getWalkingRoute({
-        startLng: startPoint.lng,
-        startLat: startPoint.lat,
-        endLng: destinationPoint.lng,
-        endLat: destinationPoint.lat,
-      });
+      let route;
+      if (typeof resolvedMapboxService.getRoute === "function") {
+        route = await resolvedMapboxService.getRoute({
+          startLng: startPoint.lng,
+          startLat: startPoint.lat,
+          endLng: destinationPoint.lng,
+          endLat: destinationPoint.lat,
+          profile: requestedMode,
+        });
+      } else {
+        route = await resolvedMapboxService.getWalkingRoute({
+          startLng: startPoint.lng,
+          startLat: startPoint.lat,
+          endLng: destinationPoint.lng,
+          endLat: destinationPoint.lat,
+        });
+      }
 
       res.json({
         route: {
@@ -187,6 +215,8 @@ function createApp({ routeService = null, mapboxService = null, indoorUiRouteSer
       map: createIndoorMapPayload(sampleCampus),
     });
   });
+
+  registerFrontendStaticHosting(app);
 
   app.use((error, _req, res, _next) => {
     if (error instanceof AppError) {
