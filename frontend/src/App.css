@@ -1,0 +1,135 @@
+:root {
+    --app-bg: #ece5da;
+    --app-bg-soft: #f7f3eb;
+    --surface: rgba(252, 250, 246, 0.9);
+    --surface-strong: rgba(255, 254, 251, 0.96);
+    --surface-muted: #f1ece3;
+    --line: rgba(70, 52, 31, 0.12);
+    --line-strong: rgba(70, 52, 31, 0.2);
+    --ink: #1f1b17;
+    --muted: #6f655b;
+    --accent: #9a7a43;
+    --accent-soft: rgba(154, 122, 67, 0.14);
+    --shadow-soft: 0 24px 70px rgba(46, 34, 19, 0.08);
+    --shadow-strong: 0 30px 90px rgba(28, 21, 11, 0.14);
+    --font-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+    --font-ui: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+    height: 100%;
+}
+
+body {
+    margin: 0;
+    background:
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.7), transparent 32%),
+        linear-gradient(135deg, #efe8dc 0%, #e9e1d5 42%, #f5f0e9 100%);
+    color: var(--ink);
+    font-family: var(--font-ui);
+}
+
+button,
+input,
+select,
+textarea {
+    font: inherit;
+}
+
+.appShell {
+    min-height: 100%;
+    padding: 24px;
+    position: relative;
+    isolation: isolate;
+}
+
+.appShell::before,
+.appShell::after {
+    content: "";
+    position: fixed;
+    border-radius: 999px;
+    pointer-events: none;
+    z-index: -1;
+    filter: blur(12px);
+}
+
+.appShell::before {
+    width: 24rem;
+    height: 24rem;
+    top: -8rem;
+    right: -6rem;
+    background: rgba(154, 122, 67, 0.08);
+}
+
+.appShell::after {
+    width: 18rem;
+    height: 18rem;
+    bottom: -7rem;
+    left: -4rem;
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.appShell > * {
+    min-height: calc(100vh - 48px);
+}
+
+.appModeFrame {
+    position: relative;
+}
+
+.appBackButton {
+    position: absolute;
+    top: 22px;
+    right: 22px;
+    z-index: 30;
+    padding: 12px 18px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: rgba(255, 252, 246, 0.92);
+    color: var(--ink);
+    letter-spacing: 0.02em;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 12px 28px rgba(43, 31, 17, 0.08);
+    backdrop-filter: blur(18px);
+    transition:
+        transform 180ms ease,
+        background-color 180ms ease,
+        border-color 180ms ease,
+        box-shadow 180ms ease;
+}
+
+.appBackButton:hover {
+    transform: translateY(-1px);
+    background: rgba(255, 254, 251, 0.98);
+    border-color: var(--line-strong);
+    box-shadow: 0 16px 34px rgba(43, 31, 17, 0.12);
+}
+
+.appBackButton:focus-visible {
+    outline: 2px solid rgba(154, 122, 67, 0.45);
+    outline-offset: 3px;
+}
+
+@media (max-width: 900px) {
+    .appShell {
+        padding: 14px;
+    }
+
+    .appShell > * {
+        min-height: calc(100vh - 28px);
+    }
+
+    .appBackButton {
+        top: 16px;
+        right: 16px;
+        padding: 10px 15px;
+    }
+}
