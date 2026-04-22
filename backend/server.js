@@ -8,11 +8,28 @@ const cors = require("cors");
 const { createSampleRouteService, sampleCampus } = require("./src/indoor-routing");
 const { IndoorUiRouteService } = require("./src/api");
 const { MapboxService, HybridRouteService } = require("./src/routing");
+const { getEnvironmentDiagnostics } = require("./src/config/env");
 const { AppError, ValidationError } = require("./src/indoor-routing/utils/errors");
 
 const FRONTEND_DIST_PATH = path.resolve(__dirname, "..", "frontend", "dist");
 const FRONTEND_INDEX_PATH = path.join(FRONTEND_DIST_PATH, "index.html");
 const VERCEL_BACKEND_ROUTE_PREFIX = "/_/backend";
+const BACKEND_BOOT_ID = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+const BACKEND_STARTED_AT = new Date().toISOString();
+
+function logBackendEvent(event, details = {}) {
+  console.log(
+    `[backend] ${JSON.stringify({
+      event,
+      bootId: BACKEND_BOOT_ID,
+      at: new Date().toISOString(),
+      isVercel: Boolean(process.env.VERCEL),
+      vercelEnv: process.env.VERCEL_ENV || null,
+      vercelRegion: process.env.VERCEL_REGION || null,
+      ...details,
+    })}`,
+  );
+}
 
 function parseCoordinatePoint(value, fieldName) {
   let lng;
@@ -93,6 +110,13 @@ function createApp({ routeService = null, mapboxService = null, indoorUiRouteSer
       campusData: sampleCampus,
     });
   const resolvedIndoorUiRouteService = indoorUiRouteService || new IndoorUiRouteService();
+  const environmentDiagnostics = getEnvironmentDiagnostics();
+
+  logBackendEvent("app_initialized", {
+    nodeVersion: process.version,
+    pid: process.pid,
+    ...environmentDiagnostics,
+  });
 
   app.use(cors());
 
@@ -112,11 +136,31 @@ function createApp({ routeService = null, mapboxService = null, indoorUiRouteSer
   app.use(express.json());
 
   app.get("/health", (_req, res) => {
-    res.json({ status: "ok" });
+    logBackendEvent("health_check", { route: "/health" });
+    res.json({
+      status: "ok",
+      backendRunning: true,
+      bootId: BACKEND_BOOT_ID,
+      startedAt: BACKEND_STARTED_AT,
+      environment: {
+        mapboxAccessTokenConfigured: environmentDiagnostics.mapboxAccessTokenConfigured,
+        mapboxAccessTokenSource: environmentDiagnostics.mapboxAccessTokenSource,
+      },
+    });
   });
 
   app.get("/api/health", (_req, res) => {
-    res.json({ status: "ok" });
+    logBackendEvent("health_check", { route: "/api/health" });
+    res.json({
+      status: "ok",
+      backendRunning: true,
+      bootId: BACKEND_BOOT_ID,
+      startedAt: BACKEND_STARTED_AT,
+      environment: {
+        mapboxAccessTokenConfigured: environmentDiagnostics.mapboxAccessTokenConfigured,
+        mapboxAccessTokenSource: environmentDiagnostics.mapboxAccessTokenSource,
+      },
+    });
   });
 
   async function computeRouteHandler(req, res, next) {
@@ -235,12 +279,24 @@ function createApp({ routeService = null, mapboxService = null, indoorUiRouteSer
 
   app.use((error, _req, res, _next) => {
     if (error instanceof AppError) {
+      logBackendEvent("app_error", {
+        code: error.code,
+        statusCode: error.statusCode,
+        message: error.message,
+      });
       return res.status(error.statusCode).json({
         error: error.code,
         message: error.message,
         details: error.details || null,
       });
     }
+
+    console.error("[backend] Unhandled error", error);
+    logBackendEvent("app_error", {
+      code: "INTERNAL_SERVER_ERROR",
+      statusCode: 500,
+      message: error?.message || "Unhandled exception",
+    });
 
     return res.status(500).json({
       error: "INTERNAL_SERVER_ERROR",
@@ -255,7 +311,7 @@ function startServer() {
   const app = createApp();
   const port = process.env.PORT || 3001;
   app.listen(port, () => {
-    console.log(`Backend listening on port ${port}`);
+    logBackendEvent("http_server_listening", { port: Number(port) });
   });
 }
 
