@@ -16,12 +16,12 @@ test("IndoorUiRouteService lists campus buildings", () => {
 test("IndoorUiRouteService computes indoor-ui route contract", () => {
     const service = new IndoorUiRouteService();
     const route = service.computeRoute({
-        from: "west-garage",
-        to: "north-pavilion",
+        from: "main-garage",
+        to: "main-hospital",
     });
 
-    assert.equal(route.from, "west-garage");
-    assert.equal(route.to, "north-pavilion");
+    assert.equal(route.from, "main-garage");
+    assert.equal(route.to, "main-hospital");
     assert.ok(Array.isArray(route.steps));
     assert.ok(Array.isArray(route.waypoints));
     assert.equal(typeof route.distanceFt, "number");
@@ -32,7 +32,7 @@ test("IndoorUiRouteService rejects identical start and destination", () => {
     const service = new IndoorUiRouteService();
 
     assert.throws(
-        () => service.computeRoute({ from: "west-garage", to: "west-garage" }),
+        () => service.computeRoute({ from: "main-garage", to: "main-garage" }),
         (error) => {
             assert.equal(error.code, "VALIDATION_ERROR");
             return true;
