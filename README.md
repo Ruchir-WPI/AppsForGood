@@ -106,3 +106,52 @@ npm test
 npm run lint
 npm run build
 ```
+
+## Vercel Deployment (Monorepo Services)
+
+This repo is configured with root-level `vercel.json` using `experimentalServices`:
+
+- frontend service
+  - entrypoint: `frontend`
+  - framework: `vite`
+  - route prefix: `/`
+- backend service
+  - entrypoint: `backend`
+  - route prefix: `/_/backend`
+
+### 1. Import The Repo In Vercel
+
+1. Create a new Vercel project and import this repository.
+2. Keep the repo root as the project root.
+3. Vercel will read `vercel.json` and create the frontend/backend services routing.
+
+### 2. Add Environment Variables In Vercel
+
+Set these for Production (and Preview if desired):
+
+- `MAPBOX_ACCESS_TOKEN`
+- `VITE_MAPBOX_TOKEN`
+- optional: `MAPBOX_DIRECTIONS_BASE_URL` (defaults to `https://api.mapbox.com`)
+- optional override: `VITE_API_BASE`
+
+`VITE_API_BASE` is optional because frontend defaults are:
+
+- local dev: `/api`
+- production build: `/_/backend/api`
+
+### 3. Deploy
+
+Deploy from Vercel UI or CLI:
+
+```bash
+npm i -g vercel
+vercel
+vercel --prod
+```
+
+### 4. Post-Deploy Checks
+
+- Frontend loads at your Vercel domain.
+- Backend health endpoint responds at:
+  - `https://<your-domain>/_/backend/api/health`
+- Outdoor routing and geocode work (requires valid Mapbox token).

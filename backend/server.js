@@ -12,6 +12,7 @@ const { AppError, ValidationError } = require("./src/indoor-routing/utils/errors
 
 const FRONTEND_DIST_PATH = path.resolve(__dirname, "..", "frontend", "dist");
 const FRONTEND_INDEX_PATH = path.join(FRONTEND_DIST_PATH, "index.html");
+const VERCEL_BACKEND_ROUTE_PREFIX = "/_/backend";
 
 function parseCoordinatePoint(value, fieldName) {
   let lng;
@@ -94,6 +95,20 @@ function createApp({ routeService = null, mapboxService = null, indoorUiRouteSer
   const resolvedIndoorUiRouteService = indoorUiRouteService || new IndoorUiRouteService();
 
   app.use(cors());
+
+  // Vercel services may forward requests with the backend route prefix still attached.
+  // Strip that prefix so existing /api routes continue to work unchanged.
+  app.use((req, _res, next) => {
+    if (
+      req.url === VERCEL_BACKEND_ROUTE_PREFIX
+      || req.url.startsWith(`${VERCEL_BACKEND_ROUTE_PREFIX}/`)
+    ) {
+      req.url = req.url.slice(VERCEL_BACKEND_ROUTE_PREFIX.length) || "/";
+    }
+
+    next();
+  });
+
   app.use(express.json());
 
   app.get("/health", (_req, res) => {
