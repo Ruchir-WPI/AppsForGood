@@ -59,6 +59,11 @@ Set these in the repo-root `.env` (or your process environment):
 
 If you are using one Mapbox token for both frontend and backend, set both `MAPBOX_ACCESS_TOKEN` and `VITE_MAPBOX_TOKEN` to the same value.
 
+Backend token lookup is resilient in deployment environments:
+
+- uses `MAPBOX_ACCESS_TOKEN` first
+- falls back to `VITE_MAPBOX_TOKEN` if needed
+
 Frontend dev server proxy routes `/api/*` to `http://localhost:3001`, so frontend components can call backend endpoints directly during local development. The Vite config reads env vars from the repo root.
 
 ### Hybrid Route Request Example
@@ -134,6 +139,8 @@ Set these for Production (and Preview if desired):
 - optional: `MAPBOX_DIRECTIONS_BASE_URL` (defaults to `https://api.mapbox.com`)
 - optional override: `VITE_API_BASE`
 
+After changing Vercel environment variables, trigger a new deployment so frontend build-time variables (`VITE_*`) are rebuilt.
+
 `VITE_API_BASE` is optional because frontend defaults are:
 
 - local dev: `/api`
@@ -155,3 +162,21 @@ vercel --prod
 - Backend health endpoint responds at:
   - `https://<your-domain>/_/backend/api/health`
 - Outdoor routing and geocode work (requires valid Mapbox token).
+
+Health responses now include backend runtime metadata:
+
+```json
+{
+  "status": "ok",
+  "backendRunning": true,
+  "bootId": "...",
+  "startedAt": "..."
+}
+```
+
+In Vercel logs, look for backend lifecycle events prefixed with `[backend]`, including:
+
+- `app_initialized`
+- `health_check`
+- `http_server_listening` (local/server mode)
+- `app_error`
