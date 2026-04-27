@@ -193,6 +193,30 @@ describe("OutdoorNavigation", () => {
         expect(screen.getAllByText(/525 ft/i)).toHaveLength(2);
     });
 
+    it("lets the user switch between planner and directions workspaces", async () => {
+        render(<OutdoorNavigation onEnterBuilding={() => {}} />);
+
+        await waitFor(() => {
+            expect(screen.getByDisplayValue("Hospital")).toBeInTheDocument();
+        });
+
+        expect(screen.getByRole("tab", { name: /planner/i })).toHaveAttribute("aria-selected", "true");
+        expect(screen.getByRole("button", { name: /get directions/i })).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("tab", { name: /directions/i }));
+
+        expect(screen.getByRole("tab", { name: /directions/i })).toHaveAttribute("aria-selected", "true");
+        expect(
+            screen.getByText(/select a starting point and destination to preview turn-by-turn outdoor steps/i),
+        ).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: /get directions/i })).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("tab", { name: /planner/i }));
+
+        expect(screen.getByRole("tab", { name: /planner/i })).toHaveAttribute("aria-selected", "true");
+        expect(screen.getByRole("button", { name: /get directions/i })).toBeInTheDocument();
+    });
+
     it("opens the expanded location results as an accessible dialog and keeps focus contained", async () => {
         fetchGeocodeSuggestions
             .mockResolvedValueOnce([])
