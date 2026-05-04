@@ -82,6 +82,27 @@
     min-height: 100%;
 }
 
+.outdoorWrapper .outdoorDirectionsPanel {
+    max-height: clamp(360px, 58vh, 640px);
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+.outdoorWrapper .outdoorDirectionsPanel::-webkit-scrollbar {
+    width: 8px;
+}
+
+.outdoorWrapper .outdoorDirectionsPanel::-webkit-scrollbar-track {
+    background: rgba(70, 52, 31, 0.06);
+    border-radius: 999px;
+}
+
+.outdoorWrapper .outdoorDirectionsPanel::-webkit-scrollbar-thumb {
+    background: rgba(154, 122, 67, 0.32);
+    border-radius: 999px;
+}
+
 .outdoorWrapper .outdoorHero {
     display: flex;
     flex-direction: column;

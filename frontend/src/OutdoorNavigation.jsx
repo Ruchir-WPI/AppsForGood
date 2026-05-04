@@ -1270,7 +1270,7 @@ export default function OutdoorNavigation({ onEnterBuilding }) {
                             id="directions-panel"
                             role="tabpanel"
                             aria-labelledby="directions-tab"
-                            className="outdoorPanelStack"
+                            className="outdoorPanelStack outdoorDirectionsPanel"
                         >
                             {destinationSummaryCard}
 
