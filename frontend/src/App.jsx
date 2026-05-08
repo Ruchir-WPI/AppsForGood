@@ -5,7 +5,6 @@ import "./App.css";
 
 // Root app shell that switches between outdoor arrival planning and indoor routing,
 // carrying selected building/room/entrance context across that handoff.
-// AI acknowledgement: This top-level mode switch that carries outdoor destination context into indoor navigation was drafted with AI assistance and reviewed by the project author.
 export default function App() {
     const [mode, setMode] = useState("outdoor");
     const [indoorSelection, setIndoorSelection] = useState(null);
