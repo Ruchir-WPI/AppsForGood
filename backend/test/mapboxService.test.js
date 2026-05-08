@@ -1,9 +1,8 @@
-// MapboxService tests using injected fetch implementations. They verify request
-// shaping, response normalization, and upstream error translation without network access.
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
 // AI acknowledgement: These Mapbox service integration-shape tests were drafted with AI assistance and reviewed by the project author.
+// AI used: GPT-5.3-Codex
 const MapboxService = require("../src/routing/services/MapboxService");
 
 test("MapboxService parses walking route response", async () => {

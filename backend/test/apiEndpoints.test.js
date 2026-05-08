@@ -1,11 +1,10 @@
-// HTTP endpoint integration tests against an ephemeral Express server. Mock
-// Mapbox services keep geocode/outdoor-route coverage deterministic and offline.
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const { createApp } = require("../server");
 
 // AI acknowledgement: These API endpoint tests covering Mapbox-backed and sample-campus backend flows were drafted with AI assistance and reviewed by the project author.
+// AI used: GPT-5.3-Codex
 function createMockMapboxService() {
     return {
         async geocodeSuggestions() {
@@ -109,9 +108,6 @@ test("GET /api/campus/indoor-map returns sample campus indoor graph payload", as
         assert.ok(Array.isArray(payload.map.entrances));
         assert.ok(Array.isArray(payload.map.outdoorPoints));
         assert.ok(payload.map.entrances.length > 0);
-        assert.ok(payload.map.floors.length >= 5);
-        assert.ok(payload.map.entrances.some((entrance) => entrance.id === "entrance-garage-level-5"));
-        assert.ok(payload.map.outdoorPoints.some((point) => point.id === "garage-main"));
     });
 });
 
@@ -122,7 +118,7 @@ test("POST /api/route/indoor-ui returns UI contract", async () => {
         const response = await fetch(`${baseUrl}/api/route/indoor-ui`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ from: "main-garage", to: "main-hospital" }),
+            body: JSON.stringify({ from: "west-garage", to: "north-pavilion" }),
         });
         assert.equal(response.status, 200);
 

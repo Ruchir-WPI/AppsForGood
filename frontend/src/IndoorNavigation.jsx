@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import "./IndoorNavigation.css";
+import "./MapNavigation.css";
 import { fetchIndoorGraphRoute, fetchIndoorMapData } from "./utils/navigationApi";
 import {
     CORRIDOR_BASE_WIDTH,
@@ -21,11 +21,8 @@ import {
     ROOM_AREA_OPACITY,
     SPECIAL_AREA_OPACITY,
     ZOOM_STEP,
-} from "./constants/indoorNavigation";
+} from "./constants/mapNavigation";
 
-// Indoor floor-plan router and renderer. Owns map-data loading, outdoor handoff
-// preselection, endpoint validation, SVG pan/zoom state, and graph-route display;
-// geometry is derived from lightweight node/edge data rather than full floor polygons.
 const EMPTY_INDOOR_MAP = {
     buildings: [],
     floors: [],
@@ -112,8 +109,6 @@ function estimateIndoorDuration(distanceUnits) {
 }
 
 function clampPanForZoom(pan, zoom, mapBounds) {
-    // The SVG viewBox is zoomed instead of CSS-scaled, so pan limits have to be
-    // calculated in map units and include a small overscroll cushion for touch/trackpad use.
     const visibleWidth = mapBounds.width / zoom;
     const visibleHeight = mapBounds.height / zoom;
     const baseMaxPanX = Math.max(0, (mapBounds.width - visibleWidth) / 2);
@@ -141,7 +136,6 @@ function shortenSegment(fromPoint, toPoint, insetRatio = EDGE_VISUAL_INSET_RATIO
         };
     }
 
-    // Keep both insets below half the segment so very short corridor edges never flip direction.
     const ratio = clampNumber(insetRatio, 0, 0.48);
     const insetDistance = distance * ratio;
     const unitX = dx / distance;
@@ -173,8 +167,6 @@ function buildRoomArea(roomNode, anchorPoint) {
     const dx = roomNode.x - anchorPoint.x;
     const dy = roomNode.y - anchorPoint.y;
 
-    // Rooms are inferred from graph nodes, not polygons; the nearest corridor neighbor decides
-    // which side gets the doorway and which way the room block extends.
     if (Math.abs(dy) >= Math.abs(dx)) {
         const height = ROOM_BLOCK_LONG_SIZE;
         const width = ROOM_BLOCK_SHORT_SIZE;
@@ -340,7 +332,8 @@ function StepItem({ icon, iconClassName, title, subtitle }) {
 }
 
 // AI acknowledgement: This indoor navigation composition for floor-aware rendering, endpoint controls, and route visualization was drafted with AI assistance and reviewed by the project author.
-export default function IndoorNavigation({ initialSelection = null }) {
+// AI used: GPT-5.3-Codex
+export default function MapNavigation({ initialSelection = null }) {
     const [mapData, setMapData] = useState(null);
     const [selectedBuildingId, setSelectedBuildingId] = useState("");
     const [selectedFloorId, setSelectedFloorId] = useState("");
@@ -418,8 +411,6 @@ export default function IndoorNavigation({ initialSelection = null }) {
             return;
         }
 
-        // Outdoor handoff data arrives before/while map data loads, so apply the
-        // building once after both the handoff and backend building list are available.
         if (initialSelection?.buildingId && availableBuildings.some((building) => building.id === initialSelection.buildingId)) {
             setSelectedBuildingId(initialSelection.buildingId);
         }
@@ -618,8 +609,6 @@ export default function IndoorNavigation({ initialSelection = null }) {
     const roomAreas = useMemo(() => {
         const roomStyle = getNodeStyle("room_entrance");
 
-        // Rendering room shapes is intentionally derived from graph topology so the map
-        // still works with the lightweight sample campus data that lacks room polygons.
         return floorNodes
             .filter((node) => node.type === "room_entrance" && node.roomId)
             .map((node) => {
@@ -741,8 +730,6 @@ export default function IndoorNavigation({ initialSelection = null }) {
             return;
         }
 
-        // Keep start/destination selects valid when switching buildings, and avoid
-        // silently routing from a point to itself after the option lists change.
         const defaultFrom = entranceOptions[0]?.value || roomOptions[0]?.value || "";
         const safeFrom = endpointValues.has(fromEndpoint) ? fromEndpoint : defaultFrom;
         if (safeFrom !== fromEndpoint) {
@@ -809,8 +796,6 @@ export default function IndoorNavigation({ initialSelection = null }) {
         const currentX = mapBounds.x + ((mapBounds.width - currentWidth) / 2) + clampedPan.x;
         const currentY = mapBounds.y + ((mapBounds.height - currentHeight) / 2) + clampedPan.y;
 
-        // Preserve the map coordinate under the pointer while zooming; otherwise wheel
-        // zoom recenters on every tick and feels like the floor plan is sliding away.
         const focusX = currentX + (anchor.xRatio * currentWidth);
         const focusY = currentY + (anchor.yRatio * currentHeight);
 
@@ -855,8 +840,6 @@ export default function IndoorNavigation({ initialSelection = null }) {
             applyZoom(zoom + delta, { xRatio, yRatio });
         };
 
-        // React's synthetic wheel events may be passive in modern browsers; native
-        // listener keeps preventDefault reliable so the page does not scroll while zooming.
         container.addEventListener("wheel", handleNativeWheel, { passive: false });
 
         return () => {
@@ -973,8 +956,6 @@ export default function IndoorNavigation({ initialSelection = null }) {
                 destination,
                 buildingId: selectedBuildingId,
                 options: {
-                    // Backend supports multiple graph algorithms; the UI pins one so
-                    // tests and displayed route metadata stay deterministic.
                     algorithm: INDOOR_ROUTING_ALGORITHM,
                 },
             });
@@ -1005,18 +986,9 @@ export default function IndoorNavigation({ initialSelection = null }) {
         <div className="wrapper">
             <div className="sidebar">
                 <div className="sidebarHeader">
-                    <div className="introBlock">
-                        <div className="logo">UMass Memorial Indoor Guide</div>
-                        <h1 className="introTitle">Move through the building with a calmer visual field.</h1>
-                        <p className="introSummary">
-                            Keep the same routing behavior, but surface it through a quieter concierge-style layout
-                            with clearer hierarchy and less visual clutter.
-                        </p>
-                    </div>
+                    <div className="logo">UMass Memorial Indoor Navigation</div>
 
                     <div className="routePanel">
-                        <div className="sectionEyebrow">Set your path</div>
-
                         <div className="controlBlock">
                             <label className="controlLabel" htmlFor="building-select">Building</label>
                             <select
@@ -1036,20 +1008,17 @@ export default function IndoorNavigation({ initialSelection = null }) {
                             </select>
                         </div>
 
-                        <div className="controlBlock">
-                            <div className="controlLabel">Floor</div>
-                            <div className="floorTabs">
-                                {floorsForBuilding.map((floor) => (
-                                    <button
-                                        key={floor.id}
-                                        type="button"
-                                        className={`floorTab${floor.id === selectedFloorId ? " floorTabActive" : ""}`}
-                                        onClick={() => setSelectedFloorId(floor.id)}
-                                    >
-                                        {floor.name}
-                                    </button>
-                                ))}
-                            </div>
+                        <div className="floorTabs">
+                            {floorsForBuilding.map((floor) => (
+                                <button
+                                    key={floor.id}
+                                    type="button"
+                                    className={`floorTab${floor.id === selectedFloorId ? " floorTabActive" : ""}`}
+                                    onClick={() => setSelectedFloorId(floor.id)}
+                                >
+                                    {floor.name}
+                                </button>
+                            ))}
                         </div>
 
                         <div className="routeRow">
@@ -1124,335 +1093,312 @@ export default function IndoorNavigation({ initialSelection = null }) {
                     </div>
                 </div>
 
-                <div className="sidebarBody">
-                    {routeData && (
-                        <div className="routeInfoPanel">
-                            <div className="sectionEyebrow">Route overview</div>
-                            <div className="routeInfo">
-                                <div className="routeMeta">
-                                    <div className="routeStat">
-                                        <strong className="routeStatNum">{formatIndoorDistance(routeData.totalDistance)}</strong>
-                                        estimated distance
-                                    </div>
-                                    <div className="routeStat">
-                                        <strong className="routeStatNum">{estimateIndoorDuration(routeData.totalDistance)}</strong>
-                                        est. walk time
-                                    </div>
-                                    <div className="routeStat">
-                                        <strong className="routeStatNum">{routeData.steps.length}</strong>
-                                        directions
-                                    </div>
-                                    <div className="routeStat">
-                                        <strong className="routeStatNum">{routeData.meta?.algorithm || "A*"}</strong>
-                                        algorithm
-                                    </div>
-                                </div>
-                                {routeFloors.length > 0 && (
-                                    <div className="routeFloors">Route floors: {routeFloors.join(" -> ")}</div>
-                                )}
+                {routeData && (
+                    <div className="routeInfo">
+                        <div className="routeMeta">
+                            <div className="routeStat">
+                                <strong className="routeStatNum">{formatIndoorDistance(routeData.totalDistance)}</strong>
+                                estimated distance
+                            </div>
+                            <div className="routeStat">
+                                <strong className="routeStatNum">{estimateIndoorDuration(routeData.totalDistance)}</strong>
+                                est. walk time
+                            </div>
+                            <div className="routeStat">
+                                <strong className="routeStatNum">{routeData.steps.length}</strong>
+                                directions
+                            </div>
+                            <div className="routeStat">
+                                <strong className="routeStatNum">{routeData.meta?.algorithm || "A*"}</strong>
+                                algorithm
                             </div>
                         </div>
+                        {routeFloors.length > 0 && (
+                            <div className="routeFloors">Route floors: {routeFloors.join(" -> ")}</div>
+                        )}
+                    </div>
+                )}
+
+                {error && <div className="errorBanner">{error}</div>}
+
+                <div className="stepsList">
+                    {!routeData ? (
+                        <StepItem
+                            icon="i"
+                            iconClassName="iconInfo"
+                            title="Select indoor start and destination"
+                            subtitle="Choose where you are and where you want to go"
+                        />
+                    ) : (
+                        <>
+                            <StepItem
+                                icon="A"
+                                iconClassName="iconNav"
+                                title={endpointLabel(fromEndpoint, roomMap, entranceMap)}
+                                subtitle="Start"
+                            />
+                            {routeData.steps.map((step, index) => (
+                                <StepItem
+                                    key={step.edgeId}
+                                    icon={index + 1}
+                                    iconClassName="iconNav"
+                                    title={step.instruction}
+                                    subtitle={`${formatIndoorDistance(step.distance)} on ${floorMap.get(step.toFloorId)?.name || step.toFloorId}`}
+                                />
+                            ))}
+                            <StepItem
+                                icon="B"
+                                iconClassName="iconDest"
+                                title={endpointLabel(toEndpoint, roomMap, entranceMap)}
+                                subtitle="Destination"
+                            />
+                        </>
                     )}
 
-                    {error && <div className="errorBanner">{error}</div>}
-
-                    <div className="stepsSection">
-                        <div className="sectionEyebrow">Instructions</div>
-                        <div className="stepsList">
-                            {!routeData ? (
-                                <StepItem
-                                    icon="i"
-                                    iconClassName="iconInfo"
-                                    title="Select indoor start and destination"
-                                    subtitle="Choose where you are and where you want to go"
-                                />
-                            ) : (
-                                <>
-                                    <StepItem
-                                        icon="A"
-                                        iconClassName="iconNav"
-                                        title={endpointLabel(fromEndpoint, roomMap, entranceMap)}
-                                        subtitle="Start"
-                                    />
-                                    {routeData.steps.map((step, index) => (
-                                        <StepItem
-                                            key={step.edgeId}
-                                            icon={index + 1}
-                                            iconClassName="iconNav"
-                                            title={step.instruction}
-                                            subtitle={`${formatIndoorDistance(step.distance)} on ${floorMap.get(step.toFloorId)?.name || step.toFloorId}`}
-                                        />
-                                    ))}
-                                    <StepItem
-                                        icon="B"
-                                        iconClassName="iconDest"
-                                        title={endpointLabel(toEndpoint, roomMap, entranceMap)}
-                                        subtitle="Destination"
-                                    />
-                                </>
-                            )}
-
-                            <div className="metaSection">
-                                <div className="metaTitle">Entrances</div>
-                                {entrancesForBuilding.map(({ entrance, node }) => (
-                                    <div key={entrance.id} className="metaLine">
-                                        <span>{entrance.label}</span>
-                                        <span>{floorMap.get(node.floorId)?.name || node.floorId}</span>
-                                    </div>
-                                ))}
-
-                                <div className="metaTitle">Outdoor Points</div>
-                                {outdoorPoints.map((point) => (
-                                    <div key={point.id} className="metaLine">
-                                        <span>{point.label}</span>
-                                        <span>{point.type}</span>
-                                    </div>
-                                ))}
+                <div className="metaSection">
+                        <div className="metaTitle">Entrances</div>
+                        {entrancesForBuilding.map(({ entrance, node }) => (
+                            <div key={entrance.id} className="metaLine">
+                                <span>{entrance.label}</span>
+                                <span>{floorMap.get(node.floorId)?.name || node.floorId}</span>
                             </div>
-                        </div>
+                        ))}
+
+                        <div className="metaTitle">Outdoor Points</div>
+                        {outdoorPoints.map((point) => (
+                            <div key={point.id} className="metaLine">
+                                <span>{point.label}</span>
+                                <span>{point.type}</span>
+                            </div>
+                        ))}
                     </div>
                 </div>
             </div>
 
-            <div className="mapStage">
-                <div className="mapHeader">
-                    <div className="sectionEyebrow">Floor plan</div>
-                    <div className="mapHeaderTitle">
-                        {selectedBuilding?.name || "Indoor map"}
-                    </div>
-                    <div className="mapHeaderMeta">
-                        {selectedFloor ? selectedFloor.name : "Select a floor"}
-                        {routeData
-                            ? ` · ${routeData.steps.length} guided step${routeData.steps.length === 1 ? "" : "s"}`
-                            : " · Generate an indoor path to preview guidance"}
-                    </div>
+            <div className="mapArea" style={{ backgroundColor: floorColor }}>
+                <div
+                    ref={mapAreaRef}
+                    className={`mapPanViewport${isPanning ? " mapPanViewportPanning" : ""}`}
+                >
+                <div className="mapLabel">
+                    {selectedBuilding?.name || "Indoor Map"}
+                    {selectedFloor ? ` - ${selectedFloor.name}` : ""}
                 </div>
 
-                <div className="mapArea" style={{ backgroundColor: floorColor }}>
-                    <div
-                        ref={mapAreaRef}
-                        className={`mapPanViewport${isPanning ? " mapPanViewportPanning" : ""}`}
-                    >
-                    <div className="mapLabel">
-                        {selectedBuilding?.name || "Indoor Map"}
-                        {selectedFloor ? ` - ${selectedFloor.name}` : ""}
-                    </div>
+                <svg
+                    viewBox={interactiveViewBox.value}
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="mapSvg"
+                    onPointerDown={handlePointerDown}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                    onPointerCancel={handlePointerUp}
+                >
+                    <rect
+                        x={mapBounds.x}
+                        y={mapBounds.y}
+                        width={mapBounds.width}
+                        height={mapBounds.height}
+                        fill={floorColor}
+                        stroke={floorColor}
+                        strokeWidth={1.2}
+                        rx={10}
+                    />
 
-                    <svg
-                        viewBox={interactiveViewBox.value}
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="mapSvg"
-                        onPointerDown={handlePointerDown}
-                        onPointerMove={handlePointerMove}
-                        onPointerUp={handlePointerUp}
-                        onPointerCancel={handlePointerUp}
-                    >
+                    {corridorBlocks.map((corridor) => (
                         <rect
-                            x={mapBounds.x}
-                            y={mapBounds.y}
-                            width={mapBounds.width}
-                            height={mapBounds.height}
-                            fill={floorColor}
-                            stroke={floorColor}
-                            strokeWidth={1.2}
-                            rx={10}
+                            key={`${corridor.id}-corridor`}
+                            x={corridor.block.x}
+                            y={corridor.block.y}
+                            width={corridor.block.width}
+                            height={corridor.block.height}
+                            rx={corridor.block.rx}
+                            fill={corridor.fill}
+                            fillOpacity={corridor.isRoomConnector ? 0.3 : 0.58}
+                            stroke={corridor.stroke}
+                            strokeOpacity={corridor.isRoomConnector ? 0.45 : 0.62}
+                            strokeWidth={corridor.isRoomConnector ? 0.9 : 1.3}
                         />
+                    ))}
 
-                        {corridorBlocks.map((corridor) => (
+                    {structuralNodeAreas.map((area) => (
+                        <g key={`${area.id}-node-area`}>
                             <rect
-                                key={`${corridor.id}-corridor`}
-                                x={corridor.block.x}
-                                y={corridor.block.y}
-                                width={corridor.block.width}
-                                height={corridor.block.height}
-                                rx={corridor.block.rx}
-                                fill={corridor.fill}
-                                fillOpacity={corridor.isRoomConnector ? 0.3 : 0.58}
-                                stroke={corridor.stroke}
-                                strokeOpacity={corridor.isRoomConnector ? 0.45 : 0.62}
-                                strokeWidth={corridor.isRoomConnector ? 0.9 : 1.3}
+                                x={area.x}
+                                y={area.y}
+                                width={area.size}
+                                height={area.size}
+                                rx={4}
+                                fill={area.fill}
+                                fillOpacity={area.isSpecial ? SPECIAL_AREA_OPACITY + 0.16 : 0.6}
+                                stroke={area.stroke}
+                                strokeOpacity={0.82}
+                                strokeWidth={1.2}
                             />
-                        ))}
+                            {area.isSpecial && (
+                                <text
+                                    x={area.x + (area.size / 2)}
+                                    y={area.y + (area.size / 2) + 1.7}
+                                    fontSize="6.4"
+                                    fill="#1f2937"
+                                    fontFamily="sans-serif"
+                                    fontWeight="700"
+                                    textAnchor="middle"
+                                >
+                                    {area.label}
+                                </text>
+                            )}
+                        </g>
+                    ))}
 
-                        {structuralNodeAreas.map((area) => (
-                            <g key={`${area.id}-node-area`}>
+                    {roomAreas.map((area) => {
+                        const centerX = area.box.x + (area.box.width / 2);
+                        const centerY = area.box.y + (area.box.height / 2);
+                        const maxTextWidth = Math.max(14, area.box.width - 7);
+                        const lineSpacing = Math.min(
+                            ROOM_LABEL_FONT_SIZE + 0.6,
+                            Math.max(ROOM_LABEL_FONT_SIZE, (area.box.height - 8) / Math.max(1, area.labelLines.length)),
+                        );
+                        const firstLineY = centerY - (((area.labelLines.length - 1) * lineSpacing) / 2);
+                        const doorway = buildDoorGapSegment(area.box, area.box.doorwayEdge);
+
+                        return (
+                            <g key={`${area.id}-room-area`}>
                                 <rect
-                                    x={area.x}
-                                    y={area.y}
-                                    width={area.size}
-                                    height={area.size}
-                                    rx={4}
+                                    x={area.box.x}
+                                    y={area.box.y}
+                                    width={area.box.width}
+                                    height={area.box.height}
+                                    rx={area.box.rx}
                                     fill={area.fill}
-                                    fillOpacity={area.isSpecial ? SPECIAL_AREA_OPACITY + 0.16 : 0.6}
+                                    fillOpacity={ROOM_AREA_OPACITY + 0.14}
                                     stroke={area.stroke}
-                                    strokeOpacity={0.82}
-                                    strokeWidth={1.2}
+                                    strokeOpacity={0.9}
+                                    strokeWidth={1.6}
                                 />
-                                {area.isSpecial && (
+
+                                <line
+                                    x1={doorway.x1}
+                                    y1={doorway.y1}
+                                    x2={doorway.x2}
+                                    y2={doorway.y2}
+                                    stroke={floorColor}
+                                    strokeWidth={3.1}
+                                    strokeLinecap="round"
+                                />
+
+                                {area.labelLines.map((line, index) => (
                                     <text
-                                        x={area.x + (area.size / 2)}
-                                        y={area.y + (area.size / 2) + 1.7}
-                                        fontSize="6.4"
-                                        fill="#1f2937"
+                                        key={`${area.id}-label-${index}`}
+                                        x={centerX}
+                                        y={firstLineY + (index * lineSpacing)}
+                                        fontSize={ROOM_LABEL_FONT_SIZE}
+                                        fill="#0f172a"
                                         fontFamily="sans-serif"
-                                        fontWeight="700"
+                                        fontWeight={index === 0 ? "700" : "600"}
                                         textAnchor="middle"
+                                        dominantBaseline="middle"
+                                        textLength={line.length > 7 ? maxTextWidth : undefined}
+                                        lengthAdjust={line.length > 7 ? "spacingAndGlyphs" : undefined}
                                     >
-                                        {area.label}
+                                        {line}
                                     </text>
-                                )}
+                                ))}
                             </g>
-                        ))}
+                        );
+                    })}
 
-                        {roomAreas.map((area) => {
-                            const centerX = area.box.x + (area.box.width / 2);
-                            const centerY = area.box.y + (area.box.height / 2);
-                            const maxTextWidth = Math.max(14, area.box.width - 7);
-                            const lineSpacing = Math.min(
-                                ROOM_LABEL_FONT_SIZE + 0.6,
-                                Math.max(ROOM_LABEL_FONT_SIZE, (area.box.height - 8) / Math.max(1, area.labelLines.length)),
-                            );
-                            const firstLineY = centerY - (((area.labelLines.length - 1) * lineSpacing) / 2);
-                            const doorway = buildDoorGapSegment(area.box, area.box.doorwayEdge);
+                    {corridorBlocks
+                        .filter((corridor) => corridor.isRouteEdge)
+                        .map((corridor) => {
+                            const isHorizontal = corridor.block.width >= corridor.block.height;
+                            const x1 = isHorizontal ? corridor.block.x : corridor.block.x + (corridor.block.width / 2);
+                            const y1 = isHorizontal ? corridor.block.y + (corridor.block.height / 2) : corridor.block.y;
+                            const x2 = isHorizontal
+                                ? corridor.block.x + corridor.block.width
+                                : corridor.block.x + (corridor.block.width / 2);
+                            const y2 = isHorizontal
+                                ? corridor.block.y + (corridor.block.height / 2)
+                                : corridor.block.y + corridor.block.height;
 
                             return (
-                                <g key={`${area.id}-room-area`}>
-                                    <rect
-                                        x={area.box.x}
-                                        y={area.box.y}
-                                        width={area.box.width}
-                                        height={area.box.height}
-                                        rx={area.box.rx}
-                                        fill={area.fill}
-                                        fillOpacity={ROOM_AREA_OPACITY + 0.14}
-                                        stroke={area.stroke}
-                                        strokeOpacity={0.9}
-                                        strokeWidth={1.6}
-                                    />
-
-                                    <line
-                                        x1={doorway.x1}
-                                        y1={doorway.y1}
-                                        x2={doorway.x2}
-                                        y2={doorway.y2}
-                                        stroke={floorColor}
-                                        strokeWidth={3.1}
-                                        strokeLinecap="round"
-                                    />
-
-                                    {area.labelLines.map((line, index) => (
-                                        <text
-                                            key={`${area.id}-label-${index}`}
-                                            x={centerX}
-                                            y={firstLineY + (index * lineSpacing)}
-                                            fontSize={ROOM_LABEL_FONT_SIZE}
-                                            fill="#0f172a"
-                                            fontFamily="sans-serif"
-                                            fontWeight={index === 0 ? "700" : "600"}
-                                            textAnchor="middle"
-                                            dominantBaseline="middle"
-                                            textLength={line.length > 7 ? maxTextWidth : undefined}
-                                            lengthAdjust={line.length > 7 ? "spacingAndGlyphs" : undefined}
-                                        >
-                                            {line}
-                                        </text>
-                                    ))}
-                                </g>
+                                <line
+                                    key={`${corridor.id}-route-segment`}
+                                    x1={x1}
+                                    y1={y1}
+                                    x2={x2}
+                                    y2={y2}
+                                    stroke={EDGE_STYLE.route}
+                                    strokeWidth={corridor.isRoomConnector ? 3.5 : 5.3}
+                                    strokeLinecap="round"
+                                    opacity={0.9}
+                                />
                             );
                         })}
 
-                        {corridorBlocks
-                            .filter((corridor) => corridor.isRouteEdge)
-                            .map((corridor) => {
-                                const isHorizontal = corridor.block.width >= corridor.block.height;
-                                const x1 = isHorizontal ? corridor.block.x : corridor.block.x + (corridor.block.width / 2);
-                                const y1 = isHorizontal ? corridor.block.y + (corridor.block.height / 2) : corridor.block.y;
-                                const x2 = isHorizontal
-                                    ? corridor.block.x + corridor.block.width
-                                    : corridor.block.x + (corridor.block.width / 2);
-                                const y2 = isHorizontal
-                                    ? corridor.block.y + (corridor.block.height / 2)
-                                    : corridor.block.y + corridor.block.height;
+                    {floorEntrances.map(({ entrance, node }) => {
+                        const point = projectedNodeMap.get(node.id);
+                        if (!point) {
+                            return null;
+                        }
 
-                                return (
-                                    <line
-                                        key={`${corridor.id}-route-segment`}
-                                        x1={x1}
-                                        y1={y1}
-                                        x2={x2}
-                                        y2={y2}
-                                        stroke={EDGE_STYLE.route}
-                                        strokeWidth={corridor.isRoomConnector ? 3.5 : 5.3}
-                                        strokeLinecap="round"
-                                        opacity={0.9}
-                                    />
-                                );
-                            })}
+                        return (
+                            <g key={entrance.id}>
+                                <rect
+                                    x={point.x - 9}
+                                    y={point.y - 9}
+                                    width={18}
+                                    height={18}
+                                    transform={`rotate(45 ${point.x} ${point.y})`}
+                                    fill="#ffffff"
+                                    stroke="#00a26d"
+                                    strokeWidth={2}
+                                />
+                                <text
+                                    x={point.x + 14}
+                                    y={point.y + 18}
+                                    fontSize="9"
+                                    fill="#065f46"
+                                    fontFamily="sans-serif"
+                                    fontWeight="700"
+                                >
+                                    {entrance.label}
+                                </text>
+                            </g>
+                        );
+                    })}
 
-                        {floorEntrances.map(({ entrance, node }) => {
-                            const point = projectedNodeMap.get(node.id);
-                            if (!point) {
-                                return null;
-                            }
-
-                            return (
-                                <g key={entrance.id}>
-                                    <rect
-                                        x={point.x - 9}
-                                        y={point.y - 9}
-                                        width={18}
-                                        height={18}
-                                        transform={`rotate(45 ${point.x} ${point.y})`}
-                                        fill="#ffffff"
-                                        stroke="#00a26d"
-                                        strokeWidth={2}
-                                    />
-                                    <text
-                                        x={point.x + 14}
-                                        y={point.y + 18}
-                                        fontSize="9"
-                                        fill="#065f46"
-                                        fontFamily="sans-serif"
-                                        fontWeight="700"
-                                    >
-                                        {entrance.label}
-                                    </text>
-                                </g>
-                            );
-                        })}
-
-                        {routeStartPoint && (
-                            <circle cx={routeStartPoint.x} cy={routeStartPoint.y} r={11} fill="#1a73e8" opacity={0.25} />
-                        )}
-                        {routeEndPoint && (
-                            <circle cx={routeEndPoint.x} cy={routeEndPoint.y} r={11} fill="#ea4335" opacity={0.25} />
-                        )}
-                    </svg>
-
-                    <div className="legendBox">
-                        {Object.entries(NODE_TYPE_STYLES)
-                            .filter(([type]) => type !== "default")
-                            .map(([type, style]) => (
-                                <div key={type} className="legendRow">
-                                    <span className="legendSwatch" style={{ background: style.fill, borderColor: style.stroke }} />
-                                    <span>{style.legend}</span>
-                                </div>
-                            ))}
-                    </div>
-
-                    {!loadingMap && floorNodes.length === 0 && (
-                        <div className="emptyState">No indoor nodes were found for this floor.</div>
+                    {routeStartPoint && (
+                        <circle cx={routeStartPoint.x} cy={routeStartPoint.y} r={11} fill="#1a73e8" opacity={0.25} />
                     )}
+                    {routeEndPoint && (
+                        <circle cx={routeEndPoint.x} cy={routeEndPoint.y} r={11} fill="#ea4335" opacity={0.25} />
+                    )}
+                </svg>
 
-                    <div className="mapControls">
-                        <button className="mapBtn" onClick={() => applyZoom(zoom + ZOOM_STEP)} title="Zoom in">+</button>
-                        <button className="mapBtn" onClick={() => applyZoom(zoom - ZOOM_STEP)} title="Zoom out">-</button>
-                        <button className="mapBtn" onClick={resetMapView} title="Reset view">o</button>
-                        <div className="zoomValue">{Math.round(zoom * 100)}%</div>
-                    </div>
+                <div className="legendBox">
+                    {Object.entries(NODE_TYPE_STYLES)
+                        .filter(([type]) => type !== "default")
+                        .map(([type, style]) => (
+                            <div key={type} className="legendRow">
+                                <span className="legendSwatch" style={{ background: style.fill, borderColor: style.stroke }} />
+                                <span>{style.legend}</span>
+                            </div>
+                        ))}
+                </div>
 
-                    {toast && <div className="toast">{toast}</div>}
-                    </div>
+                {!loadingMap && floorNodes.length === 0 && (
+                    <div className="emptyState">No indoor nodes were found for this floor.</div>
+                )}
+
+                <div className="mapControls">
+                    <button className="mapBtn" onClick={() => applyZoom(zoom + ZOOM_STEP)} title="Zoom in">+</button>
+                    <button className="mapBtn" onClick={() => applyZoom(zoom - ZOOM_STEP)} title="Zoom out">-</button>
+                    <button className="mapBtn" onClick={resetMapView} title="Reset view">o</button>
+                    <div className="zoomValue">{Math.round(zoom * 100)}%</div>
+                </div>
+
+                {toast && <div className="toast">{toast}</div>}
                 </div>
             </div>
         </div>

@@ -6,6 +6,7 @@ const assert = require("node:assert/strict");
 const IndoorUiRouteService = require("../src/api/IndoorUiRouteService");
 
 // AI acknowledgement: These indoor UI route service tests were drafted with AI assistance and reviewed by the project author.
+// AI used: GPT-5.3-Codex
 test("IndoorUiRouteService lists campus buildings", () => {
     const service = new IndoorUiRouteService();
     const buildings = service.listBuildings();
