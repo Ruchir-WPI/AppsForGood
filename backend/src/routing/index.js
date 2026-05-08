@@ -1,3 +1,6 @@
+// Routing-service barrel and sample-campus factory. Production callers can
+// inject real services, while tests/local dev can use this default in-memory
+// indoor graph plus Mapbox integration wiring.
 const { createSampleRouteService, sampleCampus } = require("../indoor-routing");
 const MapboxService = require("./services/MapboxService");
 const { HybridRouteService } = require("./services/HybridRouteService");

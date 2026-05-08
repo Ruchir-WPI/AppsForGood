@@ -1,3 +1,5 @@
+// HybridRouteService tests for outdoor-to-indoor orchestration. Mock Mapbox
+// distances let the suite verify entrance selection and fallback behavior deterministically.
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
@@ -86,13 +88,17 @@ test("hybrid route from parking garage to room returns stitched outdoor and indo
     const service = createHybridService(
         createEntranceAwareMapboxService({
             "entrance-main": 220,
-            "entrance-north": 150,
-            "entrance-east": 180,
+            "entrance-garage-level-1": 35,
+            "entrance-garage-level-2": 12,
+            "entrance-garage-level-3": 18,
+            "entrance-garage-level-4": 30,
+            "entrance-garage-level-5": 44,
+            "entrance-emergency": 95,
         }),
     );
 
     const response = await service.computeRoute({
-        start: { parkingGarageId: "garage-east" },
+        start: { parkingGarageId: "garage-main" },
         destination: { roomId: "room-202" },
         options: { wheelchairRequired: false },
     });
@@ -109,13 +115,17 @@ test("hybrid route forwards the selected indoor algorithm", async () => {
     const service = createHybridService(
         createEntranceAwareMapboxService({
             "entrance-main": 220,
-            "entrance-north": 150,
-            "entrance-east": 180,
+            "entrance-garage-level-1": 35,
+            "entrance-garage-level-2": 12,
+            "entrance-garage-level-3": 18,
+            "entrance-garage-level-4": 30,
+            "entrance-garage-level-5": 44,
+            "entrance-emergency": 95,
         }),
     );
 
     const response = await service.computeRoute({
-        start: { parkingGarageId: "garage-east" },
+        start: { parkingGarageId: "garage-main" },
         destination: { roomId: "room-202" },
         options: { algorithm: "dijkstra" },
     });
@@ -130,21 +140,25 @@ test("wheelchairRequired excludes inaccessible entrances", async () => {
         createEntranceAwareMapboxService(
             {
                 "entrance-main": 180,
-                "entrance-north": 5,
-                "entrance-east": 220,
+                "entrance-garage-level-1": 24,
+                "entrance-garage-level-2": 14,
+                "entrance-garage-level-3": 16,
+                "entrance-garage-level-4": 28,
+                "entrance-garage-level-5": 40,
+                "entrance-emergency": 1,
             },
             calls,
         ),
     );
 
     const response = await service.computeRoute({
-        start: { parkingGarageId: "garage-east" },
+        start: { parkingGarageId: "garage-main" },
         destination: { roomId: "room-202" },
         options: { wheelchairRequired: true },
     });
 
-    assert.notEqual(response.selectedEntrance.id, "entrance-north");
-    assert.equal(calls.includes("entrance-north"), false);
+    assert.notEqual(response.selectedEntrance.id, "entrance-emergency");
+    assert.equal(calls.includes("entrance-emergency"), false);
 });
 
 test("destination.entranceId forces a specific entrance", async () => {
@@ -153,15 +167,19 @@ test("destination.entranceId forces a specific entrance", async () => {
         createEntranceAwareMapboxService(
             {
                 "entrance-main": 400,
-                "entrance-north": 1,
-                "entrance-east": 1,
+                "entrance-garage-level-1": 1,
+                "entrance-garage-level-2": 1,
+                "entrance-garage-level-3": 1,
+                "entrance-garage-level-4": 1,
+                "entrance-garage-level-5": 1,
+                "entrance-emergency": 1,
             },
             calls,
         ),
     );
 
     const response = await service.computeRoute({
-        start: { parkingGarageId: "garage-east" },
+        start: { parkingGarageId: "garage-main" },
         destination: {
             roomId: "room-202",
             entranceId: "entrance-main",
@@ -176,8 +194,12 @@ test("invalid start coordinates return validation error", async () => {
     const service = createHybridService(
         createEntranceAwareMapboxService({
             "entrance-main": 200,
-            "entrance-north": 200,
-            "entrance-east": 200,
+            "entrance-garage-level-1": 200,
+            "entrance-garage-level-2": 200,
+            "entrance-garage-level-3": 200,
+            "entrance-garage-level-4": 200,
+            "entrance-garage-level-5": 200,
+            "entrance-emergency": 200,
         }),
     );
 
@@ -202,7 +224,7 @@ test("Mapbox no-route surfaces as normalized ROUTE_NOT_FOUND", async () => {
 
     await assert.rejects(
         service.computeRoute({
-            start: { parkingGarageId: "garage-east" },
+            start: { parkingGarageId: "garage-main" },
             destination: { roomId: "room-202" },
         }),
         (error) => {
@@ -222,7 +244,7 @@ test("Mapbox upstream failures surface as normalized UPSTREAM_API_ERROR", async 
 
     await assert.rejects(
         service.computeRoute({
-            start: { parkingGarageId: "garage-east" },
+            start: { parkingGarageId: "garage-main" },
             destination: { roomId: "room-202" },
         }),
         (error) => {

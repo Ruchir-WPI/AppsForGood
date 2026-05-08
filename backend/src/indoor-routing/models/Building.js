@@ -1,3 +1,5 @@
+// Building domain model with constructor-time validation. These model classes
+// intentionally stay small so Graph owns relationship integrity between entities.
 const {
     assertObject,
     assertNonEmptyString,

@@ -19,6 +19,9 @@ import { EXPANDED_GEOCODE_LIMIT } from "./constants/api";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
+// Outdoor arrival planner. Coordinates Mapbox lifecycle, geocoded start input,
+// campus building/room search, entrance-aware routing, and the handoff payload
+// used to seed indoor navigation once the user is close enough to the building.
 function formatDistance(meters) {
     const feet = meters * 3.281;
     return feet < 1000
@@ -90,6 +93,8 @@ function getSuggestionAddressLine(feature) {
         return explicitAddress;
     }
 
+    // Mapbox responses vary by feature type; fall back to the first place_name segment
+    // unless it only repeats the primary text already shown in the suggestion row.
     const placeName = typeof feature?.place_name === "string" ? feature.place_name : "";
     const firstSegment = placeName.split(",")[0]?.trim() || "";
     if (!firstSegment) {
@@ -138,6 +143,8 @@ function fuzzyScore(query, target) {
         return 100 - containsIndex;
     }
 
+    // Lightweight subsequence scoring keeps campus building/room search usable without
+    // pulling in a client-side fuzzy-search dependency for this small static dataset.
     let queryIndex = 0;
     let score = 0;
 
@@ -177,6 +184,8 @@ function pickPrimaryEntrance(entrances) {
         return null;
     }
 
+    // Business preference for destination routing: use a named main entrance first,
+    // then an accessible entrance, then the first mapped entrance as a stable fallback.
     const mainEntrance = entrances.find(
         (entrance) => typeof entrance.label === "string" && entrance.label.toLowerCase().includes("main")
     );
@@ -345,11 +354,14 @@ export default function OutdoorNavigation({ onEnterBuilding }) {
     );
 
     const destinationEntrance = useMemo(
+        // Once a start location is known, route to the nearest valid entrance instead of
+        // always using the same door; before that, fall back to the primary entrance rule.
         () => pickClosestEntrance(buildingEntrancesMap.get(selectedBuildingId) || [], userLocation),
         [buildingEntrancesMap, selectedBuildingId, userLocation]
     );
 
     const destinationTarget = useMemo(() => {
+        // Guard against bad indoor-map seed data sending Mapbox to a far-away coordinate.
         if (destinationEntrance && isWithinCampusBounds(destinationEntrance.outdoor.lng, destinationEntrance.outdoor.lat)) {
             return {
                 lng: destinationEntrance.outdoor.lng,
@@ -402,6 +414,8 @@ export default function OutdoorNavigation({ onEnterBuilding }) {
     useEffect(() => {
         if (mapRef.current) return;
 
+        // Mapbox owns DOM and WebGL state outside React, so refs gate the one-time
+        // initialization and let later effects update markers only after the load event.
         const map = new mapboxgl.Map({
             container: mapContainerRef.current,
             style: "mapbox://styles/mapbox/streets-v12",
@@ -448,6 +462,8 @@ export default function OutdoorNavigation({ onEnterBuilding }) {
                     return;
                 }
 
+                // Outdoor routing only supports campus arrival points; filter map data
+                // here so the destination chooser never offers an off-campus entrance.
                 const safeEntrances = Array.isArray(payload.entrances)
                     ? payload.entrances.filter((entrance) => isWithinCampusBounds(entrance?.outdoor?.lng, entrance?.outdoor?.lat))
                     : [];
@@ -510,6 +526,8 @@ export default function OutdoorNavigation({ onEnterBuilding }) {
         const map = mapRef.current;
         if (!map || !mapLoadedRef.current) return;
 
+        // Mapbox source/layer ids are unique; replace the route imperatively so repeated
+        // "Get Directions" clicks do not stack stale line layers.
         if (map.getLayer("route")) map.removeLayer("route");
         if (map.getSource("route")) map.removeSource("route");
 
@@ -595,6 +613,8 @@ export default function OutdoorNavigation({ onEnterBuilding }) {
         const normalizedValue = normalizeSearchText(value);
 
         try {
+            // The API helper returns [] for too-short queries, so this can run on every
+            // keystroke without duplicating minimum-length checks in the input handler.
             const results = await fetchGeocodeSuggestions(value);
             setSuggestions(results);
             setShowSuggestions(normalizedValue.length >= 3);
@@ -672,6 +692,8 @@ export default function OutdoorNavigation({ onEnterBuilding }) {
 
     useEffect(() => {
         if (showLocationSearchModal) {
+            // Manual focus management keeps the custom modal keyboard-accessible without
+            // adding a dialog library for one search-results surface.
             const focusTarget = locationSearchModalCloseButtonRef.current
                 || getLocationSearchModalFocusableElements()[0]
                 || locationSearchModalRef.current;
@@ -802,6 +824,8 @@ export default function OutdoorNavigation({ onEnterBuilding }) {
         setBuildingQuery(value);
         setShowBuildingSuggestions(true);
 
+        // Free-typing after selecting a building invalidates the selected id so directions
+        // cannot be requested for a building name that no longer matches the text field.
         if (selectedBuilding && normalizeSearchText(value) !== normalizeSearchText(selectedBuilding.name)) {
             setSelectedBuildingId("");
             setSelectedRoomId("");
@@ -878,6 +902,8 @@ export default function OutdoorNavigation({ onEnterBuilding }) {
             let startCoords = userLocation;
 
             if (!startCoords) {
+                // Users can press "Get Directions" after typing a location but before
+                // choosing a suggestion; resolve the text once before calling the route API.
                 startCoords = await resolveTypedStartLocation(addressInput);
                 if (!startCoords) {
                     return;
@@ -1270,7 +1296,7 @@ export default function OutdoorNavigation({ onEnterBuilding }) {
                             id="directions-panel"
                             role="tabpanel"
                             aria-labelledby="directions-tab"
-                            className="outdoorPanelStack"
+                            className="outdoorPanelStack outdoorDirectionsPanel"
                         >
                             {destinationSummaryCard}
 

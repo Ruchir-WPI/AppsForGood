@@ -1,3 +1,5 @@
+// Floor domain model. Validates the entity shape only; Graph is responsible for
+// proving the referenced building exists and matches related rooms/nodes.
 const {
     assertObject,
     assertNonEmptyString,

@@ -1,3 +1,5 @@
+// HTTP endpoint integration tests against an ephemeral Express server. Mock
+// Mapbox services keep geocode/outdoor-route coverage deterministic and offline.
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
@@ -107,6 +109,9 @@ test("GET /api/campus/indoor-map returns sample campus indoor graph payload", as
         assert.ok(Array.isArray(payload.map.entrances));
         assert.ok(Array.isArray(payload.map.outdoorPoints));
         assert.ok(payload.map.entrances.length > 0);
+        assert.ok(payload.map.floors.length >= 5);
+        assert.ok(payload.map.entrances.some((entrance) => entrance.id === "entrance-garage-level-5"));
+        assert.ok(payload.map.outdoorPoints.some((point) => point.id === "garage-main"));
     });
 });
 
@@ -117,7 +122,7 @@ test("POST /api/route/indoor-ui returns UI contract", async () => {
         const response = await fetch(`${baseUrl}/api/route/indoor-ui`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ from: "west-garage", to: "north-pavilion" }),
+            body: JSON.stringify({ from: "main-garage", to: "main-hospital" }),
         });
         assert.equal(response.status, 200);
 

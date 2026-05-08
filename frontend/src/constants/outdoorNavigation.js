@@ -1,8 +1,14 @@
 export const UMASS_MEMORIAL = {
-    lng: -71.7654,
-    lat: 42.2776,
-    label: "UMass Memorial Medical Center",
+    lng: -71.76205491130239,
+    lat: 42.27664395437456,
+    label: "UMass Memorial Main Hospital",
     address: "55 Lake Ave N, Worcester, MA 01655",
+};
+
+export const MAIN_GARAGE = {
+    lng: -71.76303308562642,
+    lat: 42.27472812162177,
+    label: "Main Garage",
 };
 
 export const ARRIVAL_PROMPT_DISTANCE_METERS = 120;
@@ -22,10 +28,10 @@ export const TEST_LOCATION_PRESETS = [
         lat: UMASS_MEMORIAL.lat,
     },
     {
-        id: "nearby",
-        label: "Nearby Parking",
-        lng: -71.7662,
-        lat: 42.2781,
+        id: "garage",
+        label: "Main Garage",
+        lng: MAIN_GARAGE.lng,
+        lat: MAIN_GARAGE.lat,
     },
     {
         id: "downtown",

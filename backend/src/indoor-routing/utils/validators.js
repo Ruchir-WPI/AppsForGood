@@ -1,3 +1,5 @@
+// Constructor-level validation helpers for indoor routing models. They throw
+// ValidationError so malformed seed/API data follows the same error contract.
 const { ValidationError } = require("./errors");
 
 function assertObject(value, fieldName) {

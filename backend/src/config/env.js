@@ -1,3 +1,5 @@
+// Environment accessors for backend integrations. Centralizes Mapbox token/base
+// URL resolution so services, diagnostics, and tests use the same fallback rules.
 const { ConfigError } = require("../indoor-routing/utils/errors");
 
 const DEFAULT_MAPBOX_DIRECTIONS_BASE_URL = "https://api.mapbox.com";

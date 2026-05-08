@@ -1,3 +1,6 @@
+// Public indoor-routing module surface. Exports graph entities, algorithms,
+// repository/service classes, sample seed data, and a convenience factory for
+// the in-memory sample campus used by the API and tests.
 const Building = require("./models/Building");
 const Floor = require("./models/Floor");
 const Room = require("./models/Room");

@@ -1,3 +1,5 @@
+// Manual smoke script for inspecting sample indoor routes from the command line.
+// It prints node paths and step text without starting the HTTP server.
 const { createSampleRouteService } = require("../src/indoor-routing");
 
 function printResult(title, result) {

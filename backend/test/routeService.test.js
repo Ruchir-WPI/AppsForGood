@@ -1,3 +1,5 @@
+// RouteService unit tests for algorithm selection and graph-routing contracts.
+// These protect the sample-campus route shape used by the indoor API and frontend.
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
