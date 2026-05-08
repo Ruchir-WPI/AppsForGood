@@ -23,6 +23,9 @@ import {
     ZOOM_STEP,
 } from "./constants/indoorNavigation";
 
+// Indoor floor-plan router and renderer. Owns map-data loading, outdoor handoff
+// preselection, endpoint validation, SVG pan/zoom state, and graph-route display;
+// geometry is derived from lightweight node/edge data rather than full floor polygons.
 const EMPTY_INDOOR_MAP = {
     buildings: [],
     floors: [],
@@ -109,6 +112,8 @@ function estimateIndoorDuration(distanceUnits) {
 }
 
 function clampPanForZoom(pan, zoom, mapBounds) {
+    // The SVG viewBox is zoomed instead of CSS-scaled, so pan limits have to be
+    // calculated in map units and include a small overscroll cushion for touch/trackpad use.
     const visibleWidth = mapBounds.width / zoom;
     const visibleHeight = mapBounds.height / zoom;
     const baseMaxPanX = Math.max(0, (mapBounds.width - visibleWidth) / 2);
@@ -136,6 +141,7 @@ function shortenSegment(fromPoint, toPoint, insetRatio = EDGE_VISUAL_INSET_RATIO
         };
     }
 
+    // Keep both insets below half the segment so very short corridor edges never flip direction.
     const ratio = clampNumber(insetRatio, 0, 0.48);
     const insetDistance = distance * ratio;
     const unitX = dx / distance;
@@ -167,6 +173,8 @@ function buildRoomArea(roomNode, anchorPoint) {
     const dx = roomNode.x - anchorPoint.x;
     const dy = roomNode.y - anchorPoint.y;
 
+    // Rooms are inferred from graph nodes, not polygons; the nearest corridor neighbor decides
+    // which side gets the doorway and which way the room block extends.
     if (Math.abs(dy) >= Math.abs(dx)) {
         const height = ROOM_BLOCK_LONG_SIZE;
         const width = ROOM_BLOCK_SHORT_SIZE;
@@ -410,6 +418,8 @@ export default function IndoorNavigation({ initialSelection = null }) {
             return;
         }
 
+        // Outdoor handoff data arrives before/while map data loads, so apply the
+        // building once after both the handoff and backend building list are available.
         if (initialSelection?.buildingId && availableBuildings.some((building) => building.id === initialSelection.buildingId)) {
             setSelectedBuildingId(initialSelection.buildingId);
         }
@@ -608,6 +618,8 @@ export default function IndoorNavigation({ initialSelection = null }) {
     const roomAreas = useMemo(() => {
         const roomStyle = getNodeStyle("room_entrance");
 
+        // Rendering room shapes is intentionally derived from graph topology so the map
+        // still works with the lightweight sample campus data that lacks room polygons.
         return floorNodes
             .filter((node) => node.type === "room_entrance" && node.roomId)
             .map((node) => {
@@ -729,6 +741,8 @@ export default function IndoorNavigation({ initialSelection = null }) {
             return;
         }
 
+        // Keep start/destination selects valid when switching buildings, and avoid
+        // silently routing from a point to itself after the option lists change.
         const defaultFrom = entranceOptions[0]?.value || roomOptions[0]?.value || "";
         const safeFrom = endpointValues.has(fromEndpoint) ? fromEndpoint : defaultFrom;
         if (safeFrom !== fromEndpoint) {
@@ -795,6 +809,8 @@ export default function IndoorNavigation({ initialSelection = null }) {
         const currentX = mapBounds.x + ((mapBounds.width - currentWidth) / 2) + clampedPan.x;
         const currentY = mapBounds.y + ((mapBounds.height - currentHeight) / 2) + clampedPan.y;
 
+        // Preserve the map coordinate under the pointer while zooming; otherwise wheel
+        // zoom recenters on every tick and feels like the floor plan is sliding away.
         const focusX = currentX + (anchor.xRatio * currentWidth);
         const focusY = currentY + (anchor.yRatio * currentHeight);
 
@@ -839,6 +855,8 @@ export default function IndoorNavigation({ initialSelection = null }) {
             applyZoom(zoom + delta, { xRatio, yRatio });
         };
 
+        // React's synthetic wheel events may be passive in modern browsers; native
+        // listener keeps preventDefault reliable so the page does not scroll while zooming.
         container.addEventListener("wheel", handleNativeWheel, { passive: false });
 
         return () => {
@@ -955,6 +973,8 @@ export default function IndoorNavigation({ initialSelection = null }) {
                 destination,
                 buildingId: selectedBuildingId,
                 options: {
+                    // Backend supports multiple graph algorithms; the UI pins one so
+                    // tests and displayed route metadata stay deterministic.
                     algorithm: INDOOR_ROUTING_ALGORITHM,
                 },
             });
