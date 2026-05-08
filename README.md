@@ -71,7 +71,7 @@ Frontend dev server proxy routes `/api/*` to `http://localhost:3001`, so fronten
 ```json
 {
   "start": {
-    "parkingGarageId": "garage-east"
+    "parkingGarageId": "garage-main"
   },
   "destination": {
     "roomId": "room-202"
