@@ -1,3 +1,5 @@
+// Dijkstra pathfinding for indoor graphs. Used as the deterministic baseline
+// algorithm and as the effective behavior when A* has no useful cross-floor heuristic.
 const PriorityQueue = require("./PriorityQueue");
 const { ValidationError } = require("../utils/errors");
 

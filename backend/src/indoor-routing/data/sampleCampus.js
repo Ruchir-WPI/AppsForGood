@@ -1,3 +1,6 @@
+// In-memory UMass Memorial sample campus used by local dev, tests, and demo API
+// responses. It generates graph nodes/edges from templates, so identifiers and
+// entrance coordinates must stay stable for frontend handoff tests.
 const { NODE_TYPES } = require("../models/Node");
 
 // AI acknowledgement: This sample campus seed dataset was drafted with AI assistance and reviewed by the project author.

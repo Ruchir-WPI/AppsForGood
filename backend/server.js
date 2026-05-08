@@ -3,6 +3,10 @@ const fs = require("node:fs");
 require("dotenv").config({
   path: process.env.ENV_FILE || path.resolve(__dirname, "..", ".env"),
 });
+
+// Express app factory for local and serverless deployments. Wires the sample
+// indoor graph, Mapbox-backed outdoor routing, API routes, static frontend
+// fallback, request validation, and normalized error responses in one place.
 const express = require("express");
 const cors = require("cors");
 const { createSampleRouteService, sampleCampus } = require("./src/indoor-routing");

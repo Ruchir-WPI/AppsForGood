@@ -1,3 +1,5 @@
+// MapboxService tests using injected fetch implementations. They verify request
+// shaping, response normalization, and upstream error translation without network access.
 const test = require("node:test");
 const assert = require("node:assert/strict");
 

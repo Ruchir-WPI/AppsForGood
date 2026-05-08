@@ -1,3 +1,6 @@
+// Orchestrates outdoor-to-indoor routing by trying candidate building entrances
+// and selecting the cheapest Mapbox walking route plus indoor graph path. It also
+// preserves legacy pure-indoor request support for older clients.
 const { ValidationError, RouteNotFoundError } = require("../../indoor-routing/utils/errors");
 
 const INDOOR_DISTANCE_UNIT_METERS = 1; // TODO: Calibrate this conversion against measured indoor distances.

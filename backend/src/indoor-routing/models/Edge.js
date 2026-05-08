@@ -1,3 +1,5 @@
+// Indoor graph edge model. Edges default to bidirectional and wheelchair-accessible
+// unless seed data marks constraints such as stairs-only traversal.
 const {
     assertObject,
     assertNonEmptyString,

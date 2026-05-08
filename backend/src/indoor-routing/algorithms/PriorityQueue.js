@@ -1,3 +1,5 @@
+// Small binary min-heap priority queue shared by the routing algorithms. Duplicate
+// entries are allowed; algorithms ignore stale entries after better costs appear.
 class PriorityQueue {
     constructor() {
         this.items = [];

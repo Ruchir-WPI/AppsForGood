@@ -1,3 +1,5 @@
+// In-memory indoor graph aggregate. Owns entity construction, reference
+// validation, adjacency lists, and lookup helpers consumed by routing algorithms.
 const Building = require("./Building");
 const Floor = require("./Floor");
 const Room = require("./Room");

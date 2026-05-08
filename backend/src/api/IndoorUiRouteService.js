@@ -1,3 +1,6 @@
+// Legacy indoor UI route service for coarse building-to-building preview paths.
+// It uses screen-space campus anchors and simple directional steps, not the
+// graph-based floor routing used by the newer indoor navigation API.
 const { ValidationError, RouteNotFoundError } = require("../indoor-routing/utils/errors");
 const { campusBuildings, getBuildingById } = require("./campusBuildings");
 
