@@ -339,7 +339,7 @@ function StepItem({ icon, iconClassName, title, subtitle }) {
     );
 }
 
-// AI acknowledgement: This indoor navigation composition for floor-aware rendering, endpoint controls, and route visualization was drafted with AI assistance and reviewed by the project author.
+// AI acknowledgement: This indoor navigation composition for floor-aware rendering, endpoint controls, and route visualization was drafted with AI assistance (Codex) and reviewed by the project author.
 export default function IndoorNavigation({ initialSelection = null }) {
     const [mapData, setMapData] = useState(null);
     const [selectedBuildingId, setSelectedBuildingId] = useState("");

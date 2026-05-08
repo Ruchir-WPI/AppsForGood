@@ -3,7 +3,7 @@
 // entrance coordinates must stay stable for frontend handoff tests.
 const { NODE_TYPES } = require("../models/Node");
 
-// AI acknowledgement: This sample campus seed dataset was drafted with AI assistance and reviewed by the project author.
+// AI acknowledgement: This sample campus seed dataset was drafted with AI assistance (Codex) and reviewed by the project author.
 // The active seed now uses the UMass main garage and main hospital entrance as the primary arrival anchors.
 const BUILDING_ID = "building-main";
 const MAIN_GARAGE_COORDINATES = Object.freeze({
