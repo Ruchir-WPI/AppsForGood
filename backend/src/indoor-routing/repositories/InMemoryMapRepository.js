@@ -1,3 +1,5 @@
+// Minimal repository adapter for seed-backed indoor maps. Each load returns a
+// fresh Graph so route services do not share mutable graph state across tests or requests.
 const Graph = require("../models/Graph");
 
 class InMemoryMapRepository {

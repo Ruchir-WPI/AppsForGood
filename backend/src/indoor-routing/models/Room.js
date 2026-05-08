@@ -1,3 +1,5 @@
+// Room domain model for routing destinations. A room may map to multiple graph
+// node ids, allowing RouteService to choose the best entrance node for a route.
 const {
     assertObject,
     assertNonEmptyString,

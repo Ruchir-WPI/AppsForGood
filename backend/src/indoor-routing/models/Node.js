@@ -1,3 +1,5 @@
+// Indoor graph node model and canonical node type list. Node coordinates are
+// floor-plan units used for routing heuristics and frontend SVG projection.
 const {
     assertObject,
     assertNonEmptyString,

@@ -1,3 +1,5 @@
+// Static screen-space building anchors for the legacy indoor UI preview. These
+// are intentionally coarse display coordinates rather than GIS or graph nodes.
 // Coarse campus-map coordinates used by the lightweight indoor-ui preview service.
 // These are intentionally simple screen-space anchors, aligned to the main visitor arrival path.
 const campusBuildings = [

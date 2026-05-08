@@ -1,3 +1,5 @@
+// Shared application error hierarchy. Services throw these so Express can return
+// consistent status codes, machine-readable codes, and optional diagnostic details.
 class AppError extends Error {
     constructor(message, { code = "APP_ERROR", statusCode = 500, details = null } = {}) {
         super(message);

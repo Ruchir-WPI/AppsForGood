@@ -1,3 +1,6 @@
+// Core indoor graph routing service. Normalizes legacy and nested endpoint
+// requests, resolves rooms to candidate nodes, applies accessibility filters,
+// and delegates pathfinding to A* or Dijkstra.
 const { aStar } = require("../algorithms/aStar");
 const { dijkstra } = require("../algorithms/dijkstra");
 const { ValidationError, RouteNotFoundError } = require("../utils/errors");

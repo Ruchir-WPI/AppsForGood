@@ -1,3 +1,5 @@
+// A* pathfinding for indoor graphs. The default heuristic only uses same-floor
+// Euclidean distance and deliberately falls back to Dijkstra behavior across floors/buildings.
 const PriorityQueue = require("./PriorityQueue");
 const { ValidationError } = require("../utils/errors");
 

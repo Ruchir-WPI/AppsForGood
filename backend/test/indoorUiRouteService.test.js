@@ -1,3 +1,5 @@
+// Legacy IndoorUiRouteService tests. They cover the coarse campus preview route
+// contract that remains available beside the newer graph-based indoor API.
 const test = require("node:test");
 const assert = require("node:assert/strict");
 

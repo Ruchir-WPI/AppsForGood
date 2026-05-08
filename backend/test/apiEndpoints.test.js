@@ -1,3 +1,5 @@
+// HTTP endpoint integration tests against an ephemeral Express server. Mock
+// Mapbox services keep geocode/outdoor-route coverage deterministic and offline.
 const test = require("node:test");
 const assert = require("node:assert/strict");
 

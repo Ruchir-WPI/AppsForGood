@@ -1,3 +1,5 @@
+// HybridRouteService tests for outdoor-to-indoor orchestration. Mock Mapbox
+// distances let the suite verify entrance selection and fallback behavior deterministically.
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
