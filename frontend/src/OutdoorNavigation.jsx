@@ -19,6 +19,10 @@ import { EXPANDED_GEOCODE_LIMIT } from "./constants/api";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
+// This code was made with help from https://docs.mapbox.com and AI models such as Codex.
+// Outdoor arrival planner. Coordinates Mapbox lifecycle, geocoded start input,
+// campus building/room search, entrance-aware routing, and the handoff payload
+// used to seed indoor navigation once the user is close enough to the building.
 function formatDistance(meters) {
     const feet = meters * 3.281;
     return feet < 1000

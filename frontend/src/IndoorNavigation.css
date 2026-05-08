@@ -1,5 +1,7 @@
-/* AI acknowledgement: This indoor panel, floor-map layout, and route-visual styling system was drafted with AI assistance and reviewed by the project author. */
-/* AI used: GPT-5.3-Codex */
+/* IndoorNavigation.css: Indoor route planner panels, floor map, and route visualization. */
+/* AI acknowledgement: This indoor panel, floor-map layout, and route-visual styling system was drafted with AI assistance (Codex) and reviewed by the project author. */
+
+/* Indoor layout shell */
 .wrapper {
     display: grid;
     grid-template-columns: minmax(340px, 430px) minmax(0, 1fr);
@@ -19,6 +21,7 @@
     animation: indoorReveal 560ms ease both;
 }
 
+/* Sidebar structure */
 .wrapper .sidebar {
     display: flex;
     flex-direction: column;
@@ -39,6 +42,7 @@
     gap: 18px;
 }
 
+/* Intro copy */
 .wrapper .introBlock {
     display: flex;
     flex-direction: column;
@@ -71,6 +75,7 @@
     line-height: 1.7;
 }
 
+/* Route controls */
 .wrapper .routePanel {
     margin-top: 34px;
     padding-top: 28px;
@@ -224,6 +229,7 @@
     box-shadow: none;
 }
 
+/* Route summary panels */
 .wrapper .routeInfoPanel,
 .wrapper .stepsSection {
     border: 1px solid rgba(70, 52, 31, 0.08);
@@ -285,6 +291,7 @@
     line-height: 1.5;
 }
 
+/* Step-by-step directions and metadata */
 .wrapper .stepsList {
     display: flex;
     flex-direction: column;
@@ -381,6 +388,7 @@
     text-align: right;
 }
 
+/* Floor map stage */
 .wrapper .mapStage {
     display: flex;
     flex-direction: column;
@@ -444,6 +452,7 @@
     cursor: grabbing;
 }
 
+/* Map overlays and legend */
 .wrapper .mapLabel,
 .wrapper .legendBox,
 .wrapper .mapBtn,
@@ -511,6 +520,7 @@
     pointer-events: none;
 }
 
+/* Map controls and feedback */
 .wrapper .mapControls {
     position: absolute;
     right: 18px;
@@ -572,6 +582,7 @@
     white-space: nowrap;
 }
 
+/* Focus states and animation */
 .wrapper .goBtn:focus-visible,
 .wrapper .floorTab:focus-visible,
 .wrapper .mapBtn:focus-visible,
@@ -592,6 +603,7 @@
     }
 }
 
+/* Responsive layout adjustments */
 @media (max-width: 1100px) {
     .wrapper {
         grid-template-columns: 1fr;

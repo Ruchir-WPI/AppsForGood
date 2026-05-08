@@ -4,6 +4,8 @@ import IndoorNavigation from "./IndoorNavigation.jsx";
 
 // AI acknowledgement: This top-level mode switch that carries outdoor destination context into indoor navigation was drafted with AI assistance and reviewed by the project author.
 // AI used: GPT-5.3-Codex
+// Root app shell that switches between outdoor arrival planning and indoor routing,
+// carrying selected building/room/entrance context across that handoff.
 export default function App() {
     const [mode, setMode] = useState("outdoor");
     const [indoorSelection, setIndoorSelection] = useState(null);

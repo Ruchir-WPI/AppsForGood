@@ -1,8 +1,7 @@
 const { NODE_TYPES } = require("../models/Node");
 
-// AI acknowledgement: This sample campus seed dataset was drafted with AI assistance and reviewed by the project author.
-// AI used: GPT-5.3-Codex
-// This seed includes both stairs and elevator paths so accessibility routing can be exercised.
+// AI acknowledgement: This sample campus seed dataset was drafted with AI assistance (Codex) and reviewed by the project author.
+// The active seed now uses the UMass main garage and main hospital entrance as the primary arrival anchors.
 const BUILDING_ID = "building-main";
 
 const CORRIDOR_TEMPLATE = [
