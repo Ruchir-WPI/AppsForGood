@@ -3,6 +3,10 @@ const fs = require("node:fs");
 require("dotenv").config({
   path: process.env.ENV_FILE || path.resolve(__dirname, "..", ".env"),
 });
+
+// Express app factory for local and serverless deployments. Wires the sample
+// indoor graph, Mapbox-backed outdoor routing, API routes, static frontend
+// fallback, request validation, and normalized error responses in one place.
 const express = require("express");
 const cors = require("cors");
 const { createSampleRouteService, sampleCampus } = require("./src/indoor-routing");
@@ -60,7 +64,6 @@ function parseCoordinatePoint(value, fieldName) {
 }
 
 // AI acknowledgement: This logic was drafted with AI assistance and reviewed by the project author.
-// AI used: GPT-5.3-Codex
 function createIndoorMapPayload(campusData) {
   // Clone nested sample data so API consumers cannot mutate the in-memory seed.
   return {
@@ -99,7 +102,6 @@ function registerFrontendStaticHosting(app) {
 }
 
 // AI acknowledgement: This backend app composition for Mapbox-powered outdoor routing and sample-campus hybrid routing was drafted with AI assistance and reviewed by the project author.
-// AI used: GPT-5.3-Codex
 function createApp({ routeService = null, mapboxService = null, indoorUiRouteService = null } = {}) {
   const app = express();
   // Allow tests to inject fakes while production falls back to the sample services.

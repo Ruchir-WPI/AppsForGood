@@ -1,7 +1,4 @@
-/* OutdoorNavigation.css: Outdoor route planner, map canvas, and destination search UI. */
 /* AI acknowledgement: This outdoor map sidebar, suggestion UI, and navigation-panel styling was drafted with AI assistance and reviewed by the project author. */
-
-/* Outdoor layout shell */
 .outdoorWrapper {
     display: grid;
     grid-template-areas:
@@ -26,7 +23,6 @@
     animation: outdoorReveal 560ms ease both;
 }
 
-/* Guide hero */
 .outdoorWrapper .outdoorGuideShell {
     grid-area: guide;
     position: relative;
@@ -52,18 +48,31 @@
     position: relative;
     z-index: 1;
     display: flex;
-    height: 100vh;
-    font-family: 'DM Sans', 'Segoe UI', sans-serif;
+    align-items: center;
+    min-height: 100%;
+    padding: clamp(32px, 4vw, 46px);
 }
 
-/* Sidebar structure */
 .outdoorWrapper .outdoorSidebar {
     grid-area: sidebar;
     display: flex;
     flex-direction: column;
-    border-right: 1px solid #e8e8e8;
-    z-index: 10;
+    overflow: hidden;
+    min-height: 680px;
+}
+
+.outdoorWrapper .outdoorSidebarHeader {
+    padding: 30px 34px 22px;
+    border-bottom: 1px solid rgba(70, 52, 31, 0.08);
+}
+
+.outdoorWrapper .outdoorSidebarBody {
+    flex: 1;
     overflow-y: auto;
+    padding: 24px 22px 28px 34px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
 }
 
 .outdoorWrapper .outdoorPanelStack {
@@ -94,7 +103,6 @@
     border-radius: 999px;
 }
 
-/* Hero copy */
 .outdoorWrapper .outdoorHero {
     display: flex;
     flex-direction: column;
@@ -116,13 +124,36 @@
     font-size: clamp(2.7rem, 5vw, 4.7rem);
     line-height: 0.97;
     font-weight: 600;
-    color: #666;
-    letter-spacing: 0.06em;
+    letter-spacing: -0.03em;
+    max-width: none;
+}
+
+.outdoorWrapper .outdoorIntro {
+    margin: 0;
+    max-width: none;
+    font-size: 1.02rem;
+    line-height: 1.7;
+    color: var(--muted);
+}
+
+.outdoorWrapper .outdoorFeatureStrip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 4px;
+}
+
+.outdoorWrapper .outdoorFeatureStrip span {
+    padding: 9px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(70, 52, 31, 0.1);
+    background: rgba(255, 255, 255, 0.74);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--muted);
 }
 
-/* Workspace switch and planner intro */
 .outdoorWrapper .outdoorWorkspaceSwitchFrame {
     display: flex;
     flex-direction: column;
@@ -135,16 +166,53 @@
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62);
 }
 
-.locationLabel {
-    font-size: 11px;
-    font-weight: 600;
-    color: #aaa;
+.outdoorWrapper .outdoorWorkspaceEyebrow,
+.outdoorWrapper .sectionEyebrow {
+    margin-bottom: 0;
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 6px;
+    color: var(--accent);
+    font-weight: 700;
 }
 
-.locationInputRow {
+.outdoorWrapper .outdoorWorkspaceSwitch {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding: 6px;
+    border-radius: 20px;
+    background: rgba(70, 52, 31, 0.06);
+}
+
+.outdoorWrapper .outdoorWorkspaceTab {
+    border: 0;
+    border-radius: 16px;
+    padding: 14px 16px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 0.92rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    transition:
+        transform 180ms ease,
+        background-color 180ms ease,
+        color 180ms ease,
+        box-shadow 180ms ease;
+}
+
+.outdoorWrapper .outdoorWorkspaceTab:hover {
+    color: var(--ink);
+}
+
+.outdoorWrapper .outdoorWorkspaceTabActive {
+    background: rgba(255, 255, 255, 0.94);
+    color: var(--ink);
+    box-shadow: 0 10px 24px rgba(46, 34, 19, 0.1);
+}
+
+.outdoorWrapper .plannerSection {
     display: flex;
     flex-direction: column;
     gap: 20px;
@@ -165,7 +233,6 @@
     line-height: 1.7;
 }
 
-/* Location search controls */
 .outdoorWrapper .locationSection {
     margin-bottom: 20px;
 }
@@ -185,88 +252,114 @@
     align-items: stretch;
 }
 
-.locationInputWrap {
+.outdoorWrapper .locationInputWrap {
     flex: 1;
     position: relative;
 }
 
-.locationInput {
+.outdoorWrapper .locationInput,
+.outdoorWrapper .adminCoordInput {
     width: 100%;
-    font-size: 13px;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    padding: 8px 10px;
-    background: #fafafa;
-    color: #333;
+    border: 1px solid rgba(70, 52, 31, 0.12);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.82);
+    color: var(--ink);
+    font-size: 0.96rem;
+    padding: 15px 17px;
     outline: none;
-    box-sizing: border-box;
+    transition:
+        border-color 180ms ease,
+        box-shadow 180ms ease,
+        background-color 180ms ease;
 }
 
-.locationInput:focus {
-    border-color: #1a73e8;
-    background: #fff;
+.outdoorWrapper .locationInput::placeholder,
+.outdoorWrapper .adminCoordInput::placeholder {
+    color: rgba(111, 101, 91, 0.72);
 }
 
-.suggestionsList {
+.outdoorWrapper .locationInput:focus,
+.outdoorWrapper .adminCoordInput:focus {
+    border-color: rgba(154, 122, 67, 0.45);
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 0 0 4px rgba(154, 122, 67, 0.08);
+}
+
+.outdoorWrapper .suggestionsList {
     position: absolute;
-    top: calc(100% + 4px);
+    top: calc(100% + 8px);
     left: 0;
     right: 0;
-    background: #fff;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    list-style: none;
+    z-index: 15;
     margin: 0;
-    padding: 4px 0;
-    z-index: 100;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    max-height: 260px;
+    padding: 8px 0;
+    list-style: none;
+    border: 1px solid rgba(70, 52, 31, 0.1);
+    border-radius: 22px;
+    background: rgba(255, 253, 249, 0.98);
+    box-shadow: 0 18px 34px rgba(34, 24, 12, 0.12);
+    overflow: hidden;
+    max-height: 300px;
     overflow-y: auto;
+    backdrop-filter: blur(18px);
 }
 
-.suggestionItem {
-    padding: 8px 12px;
-    cursor: pointer;
+.outdoorWrapper .suggestionItem {
     display: flex;
     flex-direction: column;
-    gap: 1px;
-}
-
-.suggestionItem:hover {
-    background: #f5f8ff;
-}
-
-.suggestionEmpty {
-    padding: 8px 12px;
-    font-size: 12px;
-    color: #8b8b8b;
-}
-
-.suggestionMoreRow {
-    padding: 4px 10px 6px;
-    border-top: 1px solid #f0f0f0;
-}
-
-.suggestionMoreBtn {
-    width: 100%;
-    border: 1px solid #d3def8;
-    background: #f5f8ff;
-    color: #1f4a86;
-    font-size: 11px;
-    font-weight: 600;
-    border-radius: 7px;
-    padding: 6px 10px;
+    gap: 3px;
+    padding: 12px 18px;
     cursor: pointer;
+    transition: background-color 150ms ease;
 }
 
-.suggestionMoreBtn:hover {
-    background: #e8f0ff;
+.outdoorWrapper .suggestionItem:hover,
+.locationModalItem:hover {
+    background: rgba(154, 122, 67, 0.08);
 }
 
-.suggestionName {
-    font-size: 13px;
-    font-weight: 500;
-    color: #222;
+.outdoorWrapper .suggestionEmpty {
+    padding: 12px 18px;
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+.outdoorWrapper .suggestionMoreRow {
+    padding: 10px 14px 2px;
+    border-top: 1px solid rgba(70, 52, 31, 0.06);
+}
+
+.outdoorWrapper .suggestionMoreBtn,
+.locationModalCloseBtn {
+    border: 1px solid rgba(70, 52, 31, 0.12);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.76);
+    color: var(--ink);
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 10px 14px;
+    cursor: pointer;
+    transition:
+        border-color 180ms ease,
+        background-color 180ms ease,
+        transform 180ms ease;
+}
+
+.outdoorWrapper .suggestionMoreBtn {
+    width: 100%;
+}
+
+.outdoorWrapper .suggestionMoreBtn:hover,
+.locationModalCloseBtn:hover {
+    border-color: rgba(70, 52, 31, 0.18);
+    background: rgba(255, 255, 255, 0.96);
+    transform: translateY(-1px);
+}
+
+.outdoorWrapper .suggestionName {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--ink);
 }
 
 .suggestionAddress {
@@ -275,30 +368,37 @@
 }
 
 .suggestionPlace {
-    font-size: 11px;
-    color: #888;
+    font-size: 0.83rem;
+    color: var(--muted);
 }
 
-.geoBtn {
-    width: 36px;
-    height: 36px;
-    flex-shrink: 0;
-    background: #f0f4ff;
-    border: 1px solid #c5d5f5;
-    border-radius: 8px;
-    font-size: 18px;
-    color: #1a73e8;
+.locationModal .suggestionPlace {
+    font-size: 0.83rem;
+    color: var(--muted);
+}
+
+.outdoorWrapper .geoBtn {
+    width: 54px;
+    flex: 0 0 54px;
+    border: 1px solid rgba(70, 52, 31, 0.12);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.78);
+    color: var(--ink);
+    font-size: 1.2rem;
     cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    transition:
+        transform 180ms ease,
+        border-color 180ms ease,
+        background-color 180ms ease;
 }
 
-.geoBtn:hover {
-    background: #ddeaff;
+.outdoorWrapper .geoBtn:hover,
+.outdoorWrapper .geoBtnActive {
+    transform: translateY(-1px);
+    border-color: rgba(154, 122, 67, 0.34);
+    background: rgba(154, 122, 67, 0.12);
 }
 
-/* Destination and admin tools */
 .outdoorWrapper .destinationCard,
 .outdoorWrapper .routeSummarySection,
 .outdoorWrapper .stepsSection,
@@ -314,97 +414,98 @@
     margin: 4px 0 18px;
 }
 
-.destRow {
+.outdoorWrapper .destRow {
     display: flex;
+    gap: 12px;
     align-items: flex-start;
-    gap: 10px;
-    margin-bottom: 12px;
 }
 
-.destDot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: #ea4335;
-    flex-shrink: 0;
-    margin-top: 4px;
+.outdoorWrapper .destDot {
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+    margin-top: 5px;
+    background: linear-gradient(135deg, #8d6f3f 0%, #c39c5c 100%);
+    box-shadow: 0 0 0 6px rgba(154, 122, 67, 0.12);
 }
 
-.destInfo {
+.outdoorWrapper .destInfo {
     flex: 1;
 }
 
-.destName {
-    font-size: 13px;
-    font-weight: 600;
-    color: #222;
+.outdoorWrapper .destName {
+    font-family: var(--font-display);
+    font-size: 1.36rem;
+    line-height: 1.1;
+    margin-bottom: 4px;
 }
 
-.destAddress {
-    font-size: 11px;
-    color: #888;
-    margin-top: 1px;
+.outdoorWrapper .destAddress {
+    color: var(--muted);
+    font-size: 0.88rem;
+    line-height: 1.6;
 }
 
-.arrivalStatus {
-    margin-bottom: 10px;
-    padding: 8px 10px;
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: 500;
-    color: #1f4a86;
-    background: #eef5ff;
-    border: 1px solid #d4e3ff;
+.outdoorWrapper .arrivalStatus {
+    margin-top: 14px;
+    padding: 12px 14px;
+    border-radius: 18px;
+    background: rgba(154, 122, 67, 0.09);
+    color: #654d25;
+    font-size: 0.88rem;
+    line-height: 1.5;
 }
 
-.arrivalStatusReady {
-    color: #166534;
-    background: #ebf9ef;
-    border-color: #b8e4c2;
+.outdoorWrapper .arrivalStatusReady {
+    background: rgba(43, 106, 73, 0.12);
+    color: #1f5537;
 }
 
-.adminTools {
-    margin-bottom: 10px;
+.outdoorWrapper .adminTools {
+    margin-bottom: 18px;
 }
 
-.adminToggleBtn {
+.outdoorWrapper .adminToggleBtn {
     width: 100%;
-    padding: 8px 10px;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    background: #fafafa;
-    color: #333;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-}
-
-.adminToggleBtn:hover {
-    background: #f2f2f2;
-}
-
-.adminToolsPanel {
-    margin-top: 8px;
-    padding: 10px;
-    border-radius: 8px;
-    border: 1px solid #ececec;
-    background: #fcfcfc;
-}
-
-.adminToolsLabel {
-    font-size: 11px;
-    font-weight: 600;
-    color: #777;
+    border: 1px solid rgba(70, 52, 31, 0.1);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.58);
+    color: var(--muted);
+    font-size: 0.82rem;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
-    margin-bottom: 8px;
+    font-weight: 700;
+    padding: 13px 16px;
+    cursor: pointer;
+    transition:
+        border-color 180ms ease,
+        background-color 180ms ease;
 }
 
-.adminPresetRow {
+.outdoorWrapper .adminToggleBtn:hover {
+    border-color: rgba(70, 52, 31, 0.16);
+    background: rgba(255, 255, 255, 0.86);
+}
+
+.outdoorWrapper .adminToolsPanel {
+    margin-top: 12px;
+    padding: 16px;
+}
+
+.outdoorWrapper .adminToolsLabel {
+    margin-bottom: 10px;
+    color: var(--muted);
+    font-size: 0.75rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 700;
+}
+
+.outdoorWrapper .adminPresetRow,
+.outdoorWrapper .adminActionRow {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
-    margin-bottom: 8px;
+    gap: 8px;
 }
 
 .outdoorWrapper .adminPresetRow {
@@ -452,7 +553,6 @@
     box-shadow: 0 8px 18px rgba(31, 27, 23, 0.08);
 }
 
-/* Route actions and directions */
 .outdoorWrapper .directionsBtn,
 .outdoorWrapper .enterBuildingBtn {
     width: 100%;
@@ -603,11 +703,11 @@
     border-top: 1px solid rgba(70, 52, 31, 0.08);
 }
 
-.stepText {
-    flex: 1;
+.outdoorWrapper .enterBuildingBtn {
+    background: linear-gradient(135deg, #274b35 0%, #1d3526 100%);
+    color: #fdfbf7;
 }
 
-/* Outdoor map shell */
 .outdoorMapShell {
     grid-area: map;
     display: flex;
@@ -665,7 +765,6 @@
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
-/* Mapbox canvas overrides */
 .outdoorMapCanvas .mapboxgl-map,
 .outdoorMapCanvas .mapboxgl-canvas {
     width: 100%;
@@ -694,28 +793,28 @@
     height: 38px;
 }
 
-/* Location picker modal */
 .locationModalBackdrop {
     position: fixed;
     inset: 0;
-    background: rgba(9, 18, 34, 0.45);
+    z-index: 1200;
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 1200;
-    padding: 16px;
+    padding: 18px;
+    background: rgba(25, 20, 14, 0.38);
+    backdrop-filter: blur(12px);
 }
 
 .locationModal {
-    width: min(560px, calc(100vw - 32px));
-    max-height: min(78vh, 740px);
-    background: #ffffff;
-    border-radius: 12px;
-    border: 1px solid #dde6f8;
-    box-shadow: 0 18px 44px rgba(16, 36, 73, 0.24);
+    width: min(620px, calc(100vw - 36px));
+    max-height: min(82vh, 780px);
+    overflow: hidden;
+    border-radius: 30px;
+    border: 1px solid rgba(70, 52, 31, 0.12);
+    background: rgba(255, 251, 246, 0.97);
+    box-shadow: var(--shadow-strong);
     display: flex;
     flex-direction: column;
-    overflow: hidden;
 }
 
 .locationModalHeader {
@@ -723,73 +822,51 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 14px 16px 10px;
-    border-bottom: 1px solid #eef2fb;
+    padding: 22px 24px 14px;
 }
 
 .locationModalTitle {
     margin: 0;
-    font-size: 15px;
-    font-weight: 700;
-    color: #22304d;
-}
-
-.locationModalCloseBtn {
-    border: 1px solid #d6deee;
-    background: #f8faff;
-    color: #3b4f75;
-    border-radius: 7px;
-    padding: 5px 10px;
-    font-size: 12px;
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    line-height: 1.05;
     font-weight: 600;
-    cursor: pointer;
-}
-
-.locationModalCloseBtn:hover {
-    background: #edf3ff;
-}
-
-.locationModalCloseBtn:focus-visible,
-.locationModalItem:focus-visible {
-    outline: 2px solid #1a73e8;
-    outline-offset: -2px;
 }
 
 .locationModalSubtitle {
-    padding: 10px 16px;
-    font-size: 12px;
-    color: #607191;
-    border-bottom: 1px solid #eef2fb;
+    padding: 0 24px 18px;
+    color: var(--muted);
+    font-size: 0.92rem;
+    line-height: 1.6;
+    border-bottom: 1px solid rgba(70, 52, 31, 0.08);
 }
 
 .locationModalBody {
     overflow-y: auto;
-    max-height: 100%;
 }
 
 .locationModalState {
-    padding: 16px;
-    font-size: 13px;
-    color: #66748f;
+    padding: 22px 24px;
+    color: var(--muted);
+    font-size: 0.95rem;
 }
 
 .locationModalStateError {
-    color: #b3261e;
+    color: #8d2d2d;
 }
 
 .locationModalList {
     list-style: none;
     margin: 0;
-    padding: 0;
+    padding: 10px 0;
 }
 
 .locationModalItem {
     width: 100%;
-    padding: 10px 16px;
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    text-align: left;
+    gap: 4px;
+    padding: 14px 24px;
     border: 0;
     background: transparent;
     text-align: left;
@@ -797,7 +874,6 @@
     transition: background-color 150ms ease;
 }
 
-/* Focus states, markers, and animation */
 .outdoorWrapper .directionsBtn:focus-visible,
 .outdoorWrapper .enterBuildingBtn:focus-visible,
 .outdoorWrapper .geoBtn:focus-visible,
@@ -813,10 +889,10 @@
     width: 20px;
     height: 20px;
     border-radius: 50% 50% 50% 0;
-    background: #ea4335;
     transform: rotate(-45deg);
-    border: 2px solid white;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(135deg, #3d2b18 0%, #9d7740 100%);
+    border: 2px solid rgba(255, 250, 243, 0.94);
+    box-shadow: 0 10px 18px rgba(42, 30, 15, 0.2);
 }
 
 .markerUser {
@@ -840,7 +916,6 @@
     }
 }
 
-/* Responsive layout adjustments */
 @media (max-width: 1100px) {
     .outdoorWrapper {
         grid-template-areas:

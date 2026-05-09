@@ -6,7 +6,6 @@ const MapboxService = require("./services/MapboxService");
 const { HybridRouteService } = require("./services/HybridRouteService");
 
 // AI acknowledgement: This default Mapbox + sample-campus service wiring was drafted with AI assistance and reviewed by the project author.
-// AI used: GPT-5.3-Codex
 function createSampleHybridRouteService({
                                             indoorRouteService = createSampleRouteService(),
                                             mapboxService = new MapboxService(),

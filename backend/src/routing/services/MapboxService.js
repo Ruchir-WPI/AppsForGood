@@ -1,8 +1,6 @@
 // Mapbox API adapter for outdoor directions and Massachusetts-scoped geocoding.
 // Converts upstream failures into AppError subclasses and returns frontend-safe
 // route/suggestion payloads instead of leaking raw Mapbox response shapes.
-// This code was made with help from https://docs.mapbox.com.
-
 const {
     RouteNotFoundError,
     UpstreamApiError,
@@ -33,7 +31,6 @@ function round(value) {
 }
 
 // AI acknowledgement: This Mapbox integration service was drafted with AI assistance and reviewed by the project author.
-// AI used: GPT-5.3-Codex
 class MapboxService {
     constructor({
                     fetchImpl = global.fetch,
