@@ -1,3 +1,6 @@
+/* App.css: Global design tokens, page shell, and shared navigation controls. */
+
+/* Design tokens */
 :root {
     --app-bg: #ece5da;
     --app-bg-soft: #f7f3eb;
@@ -16,6 +19,7 @@
     --font-ui: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
 }
 
+/* Base reset */
 * {
     box-sizing: border-box;
 }
@@ -42,6 +46,7 @@ textarea {
     font: inherit;
 }
 
+/* Application shell */
 .appShell {
     min-height: 100%;
     padding: 24px;
@@ -79,6 +84,7 @@ textarea {
     min-height: calc(100vh - 48px);
 }
 
+/* Mode frame and back navigation */
 .appModeFrame {
     position: relative;
 }
@@ -118,6 +124,7 @@ textarea {
     outline-offset: 3px;
 }
 
+/* Responsive layout adjustments */
 @media (max-width: 900px) {
     .appShell {
         padding: 14px;

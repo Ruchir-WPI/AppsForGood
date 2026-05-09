@@ -1,30 +1,8 @@
-// In-memory UMass Memorial sample campus used by local dev, tests, and demo API
-// responses. It generates graph nodes/edges from templates, so identifiers and
-// entrance coordinates must stay stable for frontend handoff tests.
 const { NODE_TYPES } = require("../models/Node");
 
-// AI acknowledgement: This sample campus seed dataset was drafted with AI assistance and reviewed by the project author.
+// AI acknowledgement: This sample campus seed dataset was drafted with AI assistance (Codex) and reviewed by the project author.
 // The active seed now uses the UMass main garage and main hospital entrance as the primary arrival anchors.
 const BUILDING_ID = "building-main";
-const MAIN_GARAGE_COORDINATES = Object.freeze({
-    lat: 42.27472812162177,
-    lng: -71.76303308562642,
-});
-const MAIN_HOSPITAL_ENTRANCE_COORDINATES = Object.freeze({
-    lat: 42.27664395437456,
-    lng: -71.76205491130239,
-});
-const EMERGENCY_ENTRANCE_COORDINATES = Object.freeze({
-    lat: MAIN_HOSPITAL_ENTRANCE_COORDINATES.lat - 0.00018,
-    lng: MAIN_HOSPITAL_ENTRANCE_COORDINATES.lng + 0.0002,
-});
-const GARAGE_LEVEL_OFFSETS = Object.freeze([
-    { lat: 0, lng: 0 },
-    { lat: 0.000018, lng: 0.000016 },
-    { lat: 0.000012, lng: -0.00002 },
-    { lat: -0.000017, lng: 0.000014 },
-    { lat: -0.000022, lng: -0.000016 },
-]);
 
 const CORRIDOR_TEMPLATE = [
     { key: "west-entry", x: 0, y: 50, label: "West Hall Entry", type: NODE_TYPES.HALLWAY },
@@ -83,52 +61,33 @@ const ROOM_SLOT_TEMPLATE = {
     "south-end": { x: 110, y: 75, anchor: "south-end" },
 };
 
-function createFloorLayout({
-    level,
-    name,
-    rooms,
-    includeMainHospitalEntrance = false,
-    includeEmergencyEntrance = false,
-}) {
-    const floorTag = `f${level}`;
-    const floorId = `floor-${level}`;
-
-    return {
-        id: floorId,
-        level,
-        name,
-        floorTag,
+const FLOOR_LAYOUTS = [
+    {
+        id: "floor-1",
+        level: 1,
+        name: "First Floor",
+        floorTag: "f1",
         nodeTypeOverrides: {
             "west-entry": NODE_TYPES.EXIT,
-            ...(includeMainHospitalEntrance ? { "north-exit": NODE_TYPES.EXIT } : {}),
-            ...(includeEmergencyEntrance ? { "east-exit": NODE_TYPES.EXIT } : {}),
+            "north-exit": NODE_TYPES.EXIT,
+            "east-exit": NODE_TYPES.EXIT,
         },
         nodeIdOverrides: {
-            "west-entry": `node-${floorTag}-garage-entry`,
-            lobby: `node-${floorTag}-lobby`,
-            junction: `node-${floorTag}-junction`,
-            stairs: `node-${floorTag}-stairs`,
-            elevator: `node-${floorTag}-elevator`,
-            ...(includeMainHospitalEntrance ? { "north-exit": `node-${floorTag}-main-entrance` } : {}),
-            ...(includeEmergencyEntrance ? { "east-exit": `node-${floorTag}-emergency-entry` } : {}),
+            "west-entry": "node-f1-entrance",
+            lobby: "node-f1-lobby",
+            junction: "node-f1-junction",
+            stairs: "node-f1-stairs",
+            elevator: "node-f1-elevator",
+            "north-exit": "node-f1-north-exit",
+            "east-exit": "node-f1-east-exit",
         },
         labelOverrides: {
-            "west-entry": `Main Garage Walkway L${level}`,
-            stairs: `Stairs L${level}`,
-            elevator: `Elevator L${level}`,
-            ...(includeMainHospitalEntrance ? { "north-exit": "Main Hospital Entrance" } : {}),
-            ...(includeEmergencyEntrance ? { "east-exit": "Emergency Entrance" } : {}),
+            "west-entry": "Main Entrance",
+            stairs: "Stairs F1",
+            elevator: "Elevator F1",
+            "north-exit": "North Entrance",
+            "east-exit": "East Entrance",
         },
-        rooms,
-    };
-}
-
-const FLOOR_LAYOUTS = [
-    createFloorLayout({
-        level: 1,
-        name: "Level 1",
-        includeMainHospitalEntrance: true,
-        includeEmergencyEntrance: true,
         rooms: [
             {
                 id: "room-101",
@@ -151,10 +110,21 @@ const FLOOR_LAYOUTS = [
             { id: "room-108", name: "Room 108 - Physical Therapy", slotKey: "south-east" },
             { id: "room-110", name: "Room 110 - Cafe Seating", slotKey: "south-end" },
         ],
-    }),
-    createFloorLayout({
+    },
+    {
+        id: "floor-2",
         level: 2,
-        name: "Level 2",
+        name: "Second Floor",
+        floorTag: "f2",
+        nodeIdOverrides: {
+            junction: "node-f2-junction",
+            stairs: "node-f2-stairs",
+            elevator: "node-f2-elevator",
+        },
+        labelOverrides: {
+            stairs: "Stairs F2",
+            elevator: "Elevator F2",
+        },
         rooms: [
             {
                 id: "room-201",
@@ -177,10 +147,16 @@ const FLOOR_LAYOUTS = [
             { id: "room-208", name: "Room 208 - GI Clinic", slotKey: "south-east" },
             { id: "room-210", name: "Room 210 - Staff Lounge", slotKey: "south-end" },
         ],
-    }),
-    createFloorLayout({
+    },
+    {
+        id: "floor-3",
         level: 3,
-        name: "Level 3",
+        name: "Third Floor",
+        floorTag: "f3",
+        labelOverrides: {
+            stairs: "Stairs F3",
+            elevator: "Elevator F3",
+        },
         rooms: [
             { id: "room-301", name: "Room 301 - ICU West", slotKey: "north-west" },
             { id: "room-302", name: "Room 302 - ICU East", slotKey: "north-mid" },
@@ -193,47 +169,8 @@ const FLOOR_LAYOUTS = [
             { id: "room-308", name: "Room 308 - Neonatal Unit", slotKey: "south-east" },
             { id: "room-310", name: "Room 310 - Pharmacy Satellite", slotKey: "south-end" },
         ],
-    }),
-    createFloorLayout({
-        level: 4,
-        name: "Level 4",
-        rooms: [
-            { id: "room-401", name: "Room 401 - Cardiac ICU", slotKey: "north-west" },
-            { id: "room-402", name: "Room 402 - Cardiac Step-Down", slotKey: "north-mid" },
-            { id: "room-403", name: "Room 403 - Cardiac Imaging", slotKey: "north-east" },
-            { id: "room-404", name: "Room 404 - Electrophysiology Lab", slotKey: "north-far-east" },
-            { id: "room-409", name: "Room 409 - Patient Education", slotKey: "north-end" },
-            { id: "room-405", name: "Room 405 - Vascular Clinic", slotKey: "south-far-west" },
-            { id: "room-406", name: "Room 406 - Heart Failure Clinic", slotKey: "south-west" },
-            { id: "room-407", name: "Room 407 - Echo Suite", slotKey: "south-connector" },
-            { id: "room-408", name: "Room 408 - Telemetry Unit", slotKey: "south-east" },
-            { id: "room-410", name: "Room 410 - Family Lounge", slotKey: "south-end" },
-        ],
-    }),
-    createFloorLayout({
-        level: 5,
-        name: "Level 5",
-        rooms: [
-            { id: "room-501", name: "Room 501 - Infusion Center", slotKey: "north-west" },
-            { id: "room-502", name: "Room 502 - Bone Marrow Clinic", slotKey: "north-mid" },
-            { id: "room-503", name: "Room 503 - Breast Center", slotKey: "north-east" },
-            { id: "room-504", name: "Room 504 - Hematology", slotKey: "north-far-east" },
-            { id: "room-509", name: "Room 509 - Integrative Care", slotKey: "north-end" },
-            { id: "room-505", name: "Room 505 - Survivorship Clinic", slotKey: "south-far-west" },
-            { id: "room-506", name: "Room 506 - Research Infusion", slotKey: "south-west" },
-            { id: "room-507", name: "Room 507 - Clinical Trials", slotKey: "south-connector" },
-            { id: "room-508", name: "Room 508 - Nutrition Services", slotKey: "south-east" },
-            { id: "room-510", name: "Room 510 - Meditation Room", slotKey: "south-end" },
-        ],
-    }),
+    },
 ];
-
-function offsetCoordinates(base, offset) {
-    return {
-        lat: base.lat + offset.lat,
-        lng: base.lng + offset.lng,
-    };
-}
 
 function createNodeId(floorTag, key) {
     return `node-${floorTag}-${key}`;
@@ -343,24 +280,32 @@ const floorNodes = Object.fromEntries(
     builtFloors.map((item) => [item.floor.id, item.nodeIdsByKey]),
 );
 
-const interFloorEdges = [];
-
-for (let level = 1; level < FLOOR_LAYOUTS.length; level += 1) {
-    interFloorEdges.push(
-        createEdge(
-            floorNodes[`floor-${level}`].stairs,
-            floorNodes[`floor-${level + 1}`].stairs,
-            12,
-            { wheelchair: false, stairsOnly: true },
-        ),
-        createEdge(
-            floorNodes[`floor-${level}`].elevator,
-            floorNodes[`floor-${level + 1}`].elevator,
-            9,
-            { wheelchair: true, stairsOnly: false },
-        ),
-    );
-}
+const interFloorEdges = [
+    createEdge(
+        floorNodes["floor-1"].stairs,
+        floorNodes["floor-2"].stairs,
+        12,
+        { wheelchair: false, stairsOnly: true },
+    ),
+    createEdge(
+        floorNodes["floor-2"].stairs,
+        floorNodes["floor-3"].stairs,
+        12,
+        { wheelchair: false, stairsOnly: true },
+    ),
+    createEdge(
+        floorNodes["floor-1"].elevator,
+        floorNodes["floor-2"].elevator,
+        9,
+        { wheelchair: true, stairsOnly: false },
+    ),
+    createEdge(
+        floorNodes["floor-2"].elevator,
+        floorNodes["floor-3"].elevator,
+        9,
+        { wheelchair: true, stairsOnly: false },
+    ),
+];
 
 const allEdges = [
     ...builtFloors.flatMap((item) => item.edges),
@@ -370,29 +315,13 @@ const allEdges = [
     ...edge,
 }));
 
-const garageEntrances = FLOOR_LAYOUTS.map((floorLayout, index) => ({
-    id: `entrance-garage-level-${floorLayout.level}`,
-    buildingId: BUILDING_ID,
-    label: `Main Garage Walkway L${floorLayout.level}`,
-    outdoor: offsetCoordinates(MAIN_GARAGE_COORDINATES, GARAGE_LEVEL_OFFSETS[index]),
-    indoorNodeId: floorNodes[floorLayout.id]["west-entry"],
-    wheelchairAccessible: true,
-}));
-
-const garageOutdoorPoints = FLOOR_LAYOUTS.map((floorLayout, index) => ({
-    id: `garage-main-level-${floorLayout.level}`,
-    label: `Main Garage Level ${floorLayout.level}`,
-    type: "parking_garage",
-    location: offsetCoordinates(MAIN_GARAGE_COORDINATES, GARAGE_LEVEL_OFFSETS[index]),
-}));
-
 const campusData = {
     buildings: [
         {
             id: BUILDING_ID,
-            name: "UMass Memorial Main Hospital",
-            code: "UMMH",
-            description: "Five-level indoor guide anchored to the main garage walkways and main hospital entrance.",
+            name: "Main Hospital Building",
+            code: "MHB",
+            description: "Multi-floor inpatient and outpatient services building.",
         },
     ],
     floors: builtFloors.map((item) => item.floor),
@@ -403,40 +332,64 @@ const campusData = {
         {
             id: "entrance-main",
             buildingId: BUILDING_ID,
-            label: "Main Hospital Entrance",
-            outdoor: MAIN_HOSPITAL_ENTRANCE_COORDINATES,
-            indoorNodeId: floorNodes["floor-1"]["north-exit"],
+            label: "Main Entrance",
+            outdoor: { lng: -71.76535, lat: 42.27758 },
+            indoorNodeId: "node-f1-entrance",
             wheelchairAccessible: true,
         },
-        ...garageEntrances,
         {
-            id: "entrance-emergency",
+            id: "entrance-north",
             buildingId: BUILDING_ID,
-            label: "Emergency Entrance",
-            outdoor: EMERGENCY_ENTRANCE_COORDINATES,
-            indoorNodeId: floorNodes["floor-1"]["east-exit"],
+            label: "North Entrance",
+            outdoor: { lng: -71.76555, lat: 42.27778 },
+            indoorNodeId: "node-f1-north-exit",
             wheelchairAccessible: false,
+        },
+        {
+            id: "entrance-east",
+            buildingId: BUILDING_ID,
+            label: "East Entrance",
+            outdoor: { lng: -71.76515, lat: 42.27755 },
+            indoorNodeId: "node-f1-east-exit",
+            wheelchairAccessible: true,
         },
     ],
     outdoorPoints: [
         {
-            id: "garage-main",
-            label: "Main Garage Entrance",
+            id: "garage-east",
+            label: "East Parking Garage",
             type: "parking_garage",
-            location: MAIN_GARAGE_COORDINATES,
+            location: { lng: -71.76495, lat: 42.27762 },
         },
-        ...garageOutdoorPoints,
+        {
+            id: "garage-west",
+            label: "West Parking Garage",
+            type: "parking_garage",
+            location: { lng: -71.76582, lat: 42.27759 },
+        },
+        {
+            id: "garage-south",
+            label: "South Parking Garage",
+            type: "parking_garage",
+            location: { lng: -71.76534, lat: 42.27733 },
+        },
         {
             id: "dropoff-main",
-            label: "Main Hospital Drop-off",
+            label: "Main Drop-off",
             type: "dropoff",
-            location: MAIN_HOSPITAL_ENTRANCE_COORDINATES,
+            location: { lng: -71.76540, lat: 42.27747 },
+        },
+        {
+            id: "dropoff-east",
+            label: "East Drop-off",
+            type: "dropoff",
+            location: { lng: -71.76518, lat: 42.27752 },
         },
         {
             id: "emergency-entrance",
             label: "Emergency Entrance",
             type: "emergency",
-            location: EMERGENCY_ENTRANCE_COORDINATES,
+            location: { lng: -71.76568, lat: 42.27743 },
         },
     ],
 };

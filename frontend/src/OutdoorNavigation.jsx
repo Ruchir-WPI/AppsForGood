@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo, useId } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
-import "./OutdoorNavigation.css";
+import "./OutdoorMap.css";
 import {
     fetchGeocodePlace,
     fetchGeocodeSuggestions,
@@ -14,11 +14,12 @@ import {
     OUTDOOR_TRANSPORT_MODES,
     TEST_LOCATION_PRESETS,
     UMASS_MEMORIAL,
-} from "./constants/outdoorNavigation";
+} from "./constants/outdoorMap";
 import { EXPANDED_GEOCODE_LIMIT } from "./constants/api";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
+// This code was made with help from https://docs.mapbox.com and AI models such as Codex.
 // Outdoor arrival planner. Coordinates Mapbox lifecycle, geocoded start input,
 // campus building/room search, entrance-aware routing, and the handoff payload
 // used to seed indoor navigation once the user is close enough to the building.
@@ -45,17 +46,6 @@ function transportVerb(mode) {
     }
 
     return "walk";
-}
-
-function formatEntranceLabel(label) {
-    const normalizedLabel = typeof label === "string" ? label.trim() : "";
-    if (!normalizedLabel) {
-        return "Entrance";
-    }
-
-    return /entrance$/i.test(normalizedLabel)
-        ? normalizedLabel
-        : `${normalizedLabel} entrance`;
 }
 
 function isValidCoordinatePair(lng, lat) {
@@ -93,8 +83,6 @@ function getSuggestionAddressLine(feature) {
         return explicitAddress;
     }
 
-    // Mapbox responses vary by feature type; fall back to the first place_name segment
-    // unless it only repeats the primary text already shown in the suggestion row.
     const placeName = typeof feature?.place_name === "string" ? feature.place_name : "";
     const firstSegment = placeName.split(",")[0]?.trim() || "";
     if (!firstSegment) {
@@ -143,8 +131,6 @@ function fuzzyScore(query, target) {
         return 100 - containsIndex;
     }
 
-    // Lightweight subsequence scoring keeps campus building/room search usable without
-    // pulling in a client-side fuzzy-search dependency for this small static dataset.
     let queryIndex = 0;
     let score = 0;
 
@@ -184,8 +170,6 @@ function pickPrimaryEntrance(entrances) {
         return null;
     }
 
-    // Business preference for destination routing: use a named main entrance first,
-    // then an accessible entrance, then the first mapped entrance as a stable fallback.
     const mainEntrance = entrances.find(
         (entrance) => typeof entrance.label === "string" && entrance.label.toLowerCase().includes("main")
     );
@@ -249,7 +233,8 @@ function isWithinCampusBounds(lng, lat) {
 }
 
 // AI acknowledgement: This outdoor map flow for geocoded start input, destination handoff, and transport-mode routing was drafted with AI assistance and reviewed by the project author.
-export default function OutdoorNavigation({ onEnterBuilding }) {
+// AI used: GPT-5.3-Codex
+export default function OutdoorMap({ onEnterBuilding }) {
     const mapContainerRef = useRef(null);
     const mapRef = useRef(null);
     const mapLoadedRef = useRef(false);
@@ -279,7 +264,6 @@ export default function OutdoorNavigation({ onEnterBuilding }) {
     const [adminLngInput, setAdminLngInput] = useState(String(UMASS_MEMORIAL.lng));
     const [adminLatInput, setAdminLatInput] = useState(String(UMASS_MEMORIAL.lat));
     const [isMapReady, setIsMapReady] = useState(false);
-    const [activeWorkspace, setActiveWorkspace] = useState("planner");
 
     const [campusMapData, setCampusMapData] = useState({
         buildings: [],
@@ -354,14 +338,11 @@ export default function OutdoorNavigation({ onEnterBuilding }) {
     );
 
     const destinationEntrance = useMemo(
-        // Once a start location is known, route to the nearest valid entrance instead of
-        // always using the same door; before that, fall back to the primary entrance rule.
         () => pickClosestEntrance(buildingEntrancesMap.get(selectedBuildingId) || [], userLocation),
         [buildingEntrancesMap, selectedBuildingId, userLocation]
     );
 
     const destinationTarget = useMemo(() => {
-        // Guard against bad indoor-map seed data sending Mapbox to a far-away coordinate.
         if (destinationEntrance && isWithinCampusBounds(destinationEntrance.outdoor.lng, destinationEntrance.outdoor.lat)) {
             return {
                 lng: destinationEntrance.outdoor.lng,
@@ -414,8 +395,6 @@ export default function OutdoorNavigation({ onEnterBuilding }) {
     useEffect(() => {
         if (mapRef.current) return;
 
-        // Mapbox owns DOM and WebGL state outside React, so refs gate the one-time
-        // initialization and let later effects update markers only after the load event.
         const map = new mapboxgl.Map({
             container: mapContainerRef.current,
             style: "mapbox://styles/mapbox/streets-v12",
@@ -462,8 +441,6 @@ export default function OutdoorNavigation({ onEnterBuilding }) {
                     return;
                 }
 
-                // Outdoor routing only supports campus arrival points; filter map data
-                // here so the destination chooser never offers an off-campus entrance.
                 const safeEntrances = Array.isArray(payload.entrances)
                     ? payload.entrances.filter((entrance) => isWithinCampusBounds(entrance?.outdoor?.lng, entrance?.outdoor?.lat))
                     : [];
@@ -526,8 +503,6 @@ export default function OutdoorNavigation({ onEnterBuilding }) {
         const map = mapRef.current;
         if (!map || !mapLoadedRef.current) return;
 
-        // Mapbox source/layer ids are unique; replace the route imperatively so repeated
-        // "Get Directions" clicks do not stack stale line layers.
         if (map.getLayer("route")) map.removeLayer("route");
         if (map.getSource("route")) map.removeSource("route");
 
@@ -613,8 +588,6 @@ export default function OutdoorNavigation({ onEnterBuilding }) {
         const normalizedValue = normalizeSearchText(value);
 
         try {
-            // The API helper returns [] for too-short queries, so this can run on every
-            // keystroke without duplicating minimum-length checks in the input handler.
             const results = await fetchGeocodeSuggestions(value);
             setSuggestions(results);
             setShowSuggestions(normalizedValue.length >= 3);
@@ -692,8 +665,6 @@ export default function OutdoorNavigation({ onEnterBuilding }) {
 
     useEffect(() => {
         if (showLocationSearchModal) {
-            // Manual focus management keeps the custom modal keyboard-accessible without
-            // adding a dialog library for one search-results surface.
             const focusTarget = locationSearchModalCloseButtonRef.current
                 || getLocationSearchModalFocusableElements()[0]
                 || locationSearchModalRef.current;
@@ -824,8 +795,6 @@ export default function OutdoorNavigation({ onEnterBuilding }) {
         setBuildingQuery(value);
         setShowBuildingSuggestions(true);
 
-        // Free-typing after selecting a building invalidates the selected id so directions
-        // cannot be requested for a building name that no longer matches the text field.
         if (selectedBuilding && normalizeSearchText(value) !== normalizeSearchText(selectedBuilding.name)) {
             setSelectedBuildingId("");
             setSelectedRoomId("");
@@ -902,8 +871,6 @@ export default function OutdoorNavigation({ onEnterBuilding }) {
             let startCoords = userLocation;
 
             if (!startCoords) {
-                // Users can press "Get Directions" after typing a location but before
-                // choosing a suggestion; resolve the text once before calling the route API.
                 startCoords = await resolveTypedStartLocation(addressInput);
                 if (!startCoords) {
                     return;
@@ -930,7 +897,6 @@ export default function OutdoorNavigation({ onEnterBuilding }) {
             });
             setSteps(routeSteps);
             setActiveStep(0);
-            setActiveWorkspace("directions");
 
             const coords = route.geometry.coordinates;
             const bounds = coords.reduce(
@@ -956,417 +922,316 @@ export default function OutdoorNavigation({ onEnterBuilding }) {
         resolveTypedStartLocation,
     ]);
 
-    const destinationSummaryCard = (
-        <div className="destinationCard">
-            <div className="destRow">
-                <div className="destDot" />
-                <div className="destInfo">
-                    <div className="destName">{selectedBuilding?.name || "Choose a destination building"}</div>
-                    <div className="destAddress">
-                        {destinationEntrance
-                            ? formatEntranceLabel(destinationEntrance.label)
-                            : "No mapped entrance for selected building."}
-                        {selectedRoom ? ` · Room: ${selectedRoom.name}` : ""}
-                    </div>
-                </div>
-            </div>
-
-            {distanceToDestinationMeters !== null && (
-                <div className={`arrivalStatus${canEnterBuilding ? " arrivalStatusReady" : ""}`}>
-                    {canEnterBuilding
-                        ? `You are at ${selectedBuilding?.name || destinationTarget.label}. Switch to indoor navigation when you are ready.`
-                        : `${formatDistance(distanceToDestinationMeters)} from ${selectedBuilding?.name || destinationTarget.label}.`}
-                </div>
-            )}
-        </div>
-    );
-
     return (
         <div className="outdoorWrapper">
-            <div className="outdoorGuideShell">
-                <div className="outdoorGuideBackdrop" aria-hidden="true" />
-                <div className="outdoorGuideContent">
-                    <div className="outdoorHero">
-                        <div className="outdoorLogo">UMass Memorial Arrival Guide</div>
-                        <h1 className="outdoorTitle">A quieter way to reach the right door.</h1>
-                        <p className="outdoorIntro">
-                            Plan the outdoor walk, target the correct entrance, and hand off to the indoor map
-                            when you are physically at the building.
-                        </p>
-                        <div className="outdoorFeatureStrip" aria-hidden="true">
-                            <span>Outdoor route</span>
-                            <span>Entrance-aware</span>
-                            <span>Indoor handoff</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <div className="outdoorSidebar">
                 <div className="outdoorSidebarHeader">
-                    <div className="outdoorWorkspaceSwitchFrame">
-                        <div className="outdoorWorkspaceEyebrow">Arrival workspace</div>
-                        <div
-                            className="outdoorWorkspaceSwitch"
-                            role="tablist"
-                            aria-label="Arrival planner views"
-                        >
+                    <div className="outdoorLogo">Navigate to UMass Memorial</div>
+
+                    <div className="locationSection">
+                        <div className="locationLabel">Your starting location</div>
+                        <div className="locationInputRow">
+                            <div className="locationInputWrap">
+                                <input
+                                    ref={startLocationInputRef}
+                                    className="locationInput"
+                                    type="text"
+                                    placeholder="Enter your address…"
+                                    value={addressInput}
+                                    onChange={(e) => handleAddressChange(e.target.value)}
+                                    onFocus={() => setShowSuggestions(normalizeSearchText(addressInput).length >= 3)}
+                                    onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                                    onKeyDown={handleStartLocationKeyDown}
+                                />
+                                {showSuggestions && (
+                                    <ul className="suggestionsList">
+                                        {suggestions.length > 0 ? (
+                                            suggestions.map((f) => (
+                                                <li
+                                                    key={f.id}
+                                                    className="suggestionItem"
+                                                    onMouseDown={() => handleSelectSuggestion(f)}
+                                                >
+                                                    <span className="suggestionName">
+                                                        {f.text}
+                                                    </span>
+                                                    {getSuggestionAddressLine(f) && (
+                                                        <span className="suggestionAddress">
+                                                            {getSuggestionAddressLine(f)}
+                                                        </span>
+                                                    )}
+                                                    {getSuggestionContextLine(f) && (
+                                                        <span className="suggestionPlace">
+                                                            {getSuggestionContextLine(f)}
+                                                        </span>
+                                                    )}
+                                                </li>
+                                            ))
+                                        ) : (
+                                            <li className="suggestionEmpty">
+                                                No Massachusetts matches yet. Press Enter to try the best place-name match.
+                                            </li>
+                                        )}
+                                        {hasTypedStartLocation && (
+                                            <li className="suggestionMoreRow">
+                                                <button
+                                                    type="button"
+                                                    className="suggestionMoreBtn"
+                                                    onMouseDown={(event) => event.preventDefault()}
+                                                    onClick={handleOpenLocationSearchModal}
+                                                >
+                                                    View More Results
+                                                </button>
+                                            </li>
+                                        )}
+                                    </ul>
+                                )}
+                            </div>
                             <button
-                                id="planner-tab"
-                                type="button"
-                                role="tab"
-                                aria-selected={activeWorkspace === "planner"}
-                                aria-controls="planner-panel"
-                                className={`outdoorWorkspaceTab${activeWorkspace === "planner" ? " outdoorWorkspaceTabActive" : ""}`}
-                                onClick={() => setActiveWorkspace("planner")}
+                                className={`geoBtn${geoStatus === "locating" ? " geoBtnActive" : ""}`}
+                                onClick={locateUser}
+                                title="Use my current location"
                             >
-                                Planner
-                            </button>
-                            <button
-                                id="directions-tab"
-                                type="button"
-                                role="tab"
-                                aria-selected={activeWorkspace === "directions"}
-                                aria-controls="directions-panel"
-                                className={`outdoorWorkspaceTab${activeWorkspace === "directions" ? " outdoorWorkspaceTabActive" : ""}`}
-                                onClick={() => setActiveWorkspace("directions")}
-                            >
-                                Directions
+                                {geoStatus === "locating" ? "…" : "⦿"}
                             </button>
                         </div>
                     </div>
 
-                    <div className="sectionEyebrow">
-                        {activeWorkspace === "planner" ? "Plan your arrival" : "Turn-by-turn directions"}
-                    </div>
-                    <div className="outdoorSidebarHeading">
-                        {activeWorkspace === "planner"
-                            ? "Set the trip before you move."
-                            : selectedBuilding?.name || "Route details appear here."}
-                    </div>
-                    <div className="outdoorSidebarIntro">
-                        {activeWorkspace === "planner"
-                            ? "Choose where you are starting, pick the correct building, and aim for the right entrance."
-                            : "Review the outdoor route, tap any step to focus it on the map, and switch to the indoor map once you arrive."}
-                    </div>
-                </div>
+                    <div className="locationSection">
+                        <div className="locationLabel">Destination building</div>
+                        <div className="locationInputWrap">
+                            <input
+                                className="locationInput"
+                                type="text"
+                                placeholder={loadingDestinations ? "Loading buildings..." : "Search buildings..."}
+                                value={buildingQuery}
+                                disabled={loadingDestinations}
+                                onChange={(e) => handleBuildingQueryChange(e.target.value)}
+                                onFocus={() => setShowBuildingSuggestions(true)}
+                                onBlur={() => setTimeout(() => setShowBuildingSuggestions(false), 150)}
+                            />
 
-                <div className="outdoorSidebarBody">
-                    {activeWorkspace === "planner" ? (
-                        <div
-                            id="planner-panel"
-                            role="tabpanel"
-                            aria-labelledby="planner-tab"
-                            className="outdoorPanelStack"
-                        >
-                            <div className="plannerSection">
-                                <div className="locationSection">
-                                    <div className="locationLabel">Your starting location</div>
-                                    <div className="locationInputRow">
-                                        <div className="locationInputWrap">
-                                            <input
-                                                ref={startLocationInputRef}
-                                                className="locationInput"
-                                                type="text"
-                                                placeholder="Enter your address…"
-                                                value={addressInput}
-                                                onChange={(e) => handleAddressChange(e.target.value)}
-                                                onFocus={() => setShowSuggestions(normalizeSearchText(addressInput).length >= 3)}
-                                                onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-                                                onKeyDown={handleStartLocationKeyDown}
-                                            />
-                                            {showSuggestions && (
-                                                <ul className="suggestionsList">
-                                                    {suggestions.length > 0 ? (
-                                                        suggestions.map((f) => (
-                                                            <li
-                                                                key={f.id}
-                                                                className="suggestionItem"
-                                                                onMouseDown={() => handleSelectSuggestion(f)}
-                                                            >
-                                                                <span className="suggestionName">
-                                                                    {f.text}
-                                                                </span>
-                                                                {getSuggestionAddressLine(f) && (
-                                                                    <span className="suggestionAddress">
-                                                                        {getSuggestionAddressLine(f)}
-                                                                    </span>
-                                                                )}
-                                                                {getSuggestionContextLine(f) && (
-                                                                    <span className="suggestionPlace">
-                                                                        {getSuggestionContextLine(f)}
-                                                                    </span>
-                                                                )}
-                                                            </li>
-                                                        ))
-                                                    ) : (
-                                                        <li className="suggestionEmpty">
-                                                            No Massachusetts matches yet. Press Enter to try the best place-name match.
-                                                        </li>
-                                                    )}
-                                                    {hasTypedStartLocation && (
-                                                        <li className="suggestionMoreRow">
-                                                            <button
-                                                                type="button"
-                                                                className="suggestionMoreBtn"
-                                                                onMouseDown={(event) => event.preventDefault()}
-                                                                onClick={handleOpenLocationSearchModal}
-                                                            >
-                                                                View More Results
-                                                            </button>
-                                                        </li>
-                                                    )}
-                                                </ul>
-                                            )}
-                                        </div>
-                                        <button
-                                            className={`geoBtn${geoStatus === "locating" ? " geoBtnActive" : ""}`}
-                                            onClick={locateUser}
-                                            title="Use my current location"
-                                        >
-                                            {geoStatus === "locating" ? "…" : "⦿"}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="locationSection">
-                                    <div className="locationLabel">Destination building</div>
-                                    <div className="locationInputWrap">
-                                        <input
-                                            className="locationInput"
-                                            type="text"
-                                            placeholder={loadingDestinations ? "Loading buildings..." : "Search buildings..."}
-                                            value={buildingQuery}
-                                            disabled={loadingDestinations}
-                                            onChange={(e) => handleBuildingQueryChange(e.target.value)}
-                                            onFocus={() => setShowBuildingSuggestions(true)}
-                                            onBlur={() => setTimeout(() => setShowBuildingSuggestions(false), 150)}
-                                        />
-
-                                        {showBuildingSuggestions && !loadingDestinations && (
-                                            <ul className="suggestionsList">
-                                                {buildingSuggestions.length > 0 ? (
-                                                    buildingSuggestions.map((building) => (
-                                                        <li
-                                                            key={building.id}
-                                                            className="suggestionItem"
-                                                            onMouseDown={() => handleSelectBuilding(building)}
-                                                        >
-                                                            <span className="suggestionName">{building.name}</span>
-                                                            <span className="suggestionPlace">
-                                                                {building.code || "Building"}
-                                                                {building.description ? ` · ${building.description}` : ""}
-                                                            </span>
-                                                        </li>
-                                                    ))
-                                                ) : (
-                                                    <li className="suggestionEmpty">No building matches your search.</li>
-                                                )}
-                                            </ul>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {selectedBuildingId && (
-                                    <div className="locationSection">
-                                        <div className="locationLabel">Destination room (optional)</div>
-                                        <div className="locationInputWrap">
-                                            <input
-                                                className="locationInput"
-                                                type="text"
-                                                placeholder="Search rooms..."
-                                                value={roomQuery}
-                                                onChange={(e) => handleRoomQueryChange(e.target.value)}
-                                                onFocus={() => setShowRoomSuggestions(true)}
-                                                onBlur={() => setTimeout(() => setShowRoomSuggestions(false), 150)}
-                                            />
-
-                                            {showRoomSuggestions && (
-                                                <ul className="suggestionsList">
-                                                    {roomSuggestions.length > 0 ? (
-                                                        roomSuggestions.map((room) => (
-                                                            <li
-                                                                key={room.id}
-                                                                className="suggestionItem"
-                                                                onMouseDown={() => handleSelectRoom(room)}
-                                                            >
-                                                                <span className="suggestionName">{room.name}</span>
-                                                                <span className="suggestionPlace">
-                                                                    {floorNameById.get(room.floorId) || room.floorId}
-                                                                    {room.id ? ` · ${room.id}` : ""}
-                                                                </span>
-                                                            </li>
-                                                        ))
-                                                    ) : (
-                                                        <li className="suggestionEmpty">No room matches your search.</li>
-                                                    )}
-                                                </ul>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div className="locationSection">
-                                    <div className="locationLabel">Transportation mode</div>
-                                    <select
-                                        className="locationInput"
-                                        value={transportMode}
-                                        onChange={(event) => setTransportMode(event.target.value)}
-                                    >
-                                        {OUTDOOR_TRANSPORT_MODES.map((modeOption) => (
-                                            <option key={modeOption.value} value={modeOption.value}>
-                                                {modeOption.label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                {destinationSummaryCard}
-
-                                <div className="adminTools">
-                                    <button
-                                        className="adminToggleBtn"
-                                        onClick={() => setShowAdminTools((prev) => !prev)}
-                                        type="button"
-                                    >
-                                        {showAdminTools ? "Hide Admin Location Tools" : "Show Admin Location Tools"}
-                                    </button>
-
-                                    {showAdminTools && (
-                                        <div className="adminToolsPanel">
-                                            <div className="adminToolsLabel">Testing controls: set user location</div>
-
-                                            <div className="adminPresetRow">
-                                                {TEST_LOCATION_PRESETS.map((preset) => (
-                                                    <button
-                                                        key={preset.id}
-                                                        className="adminPresetBtn"
-                                                        onClick={() => handleUsePresetLocation(preset)}
-                                                        type="button"
-                                                    >
-                                                        {preset.label}
-                                                    </button>
-                                                ))}
-                                            </div>
-
-                                            <div className="adminCoordRow">
-                                                <input
-                                                    className="adminCoordInput"
-                                                    type="number"
-                                                    step="0.000001"
-                                                    value={adminLngInput}
-                                                    onChange={(e) => setAdminLngInput(e.target.value)}
-                                                    placeholder="Longitude"
-                                                />
-                                                <input
-                                                    className="adminCoordInput"
-                                                    type="number"
-                                                    step="0.000001"
-                                                    value={adminLatInput}
-                                                    onChange={(e) => setAdminLatInput(e.target.value)}
-                                                    placeholder="Latitude"
-                                                />
-                                            </div>
-
-                                            <div className="adminActionRow">
-                                                <button className="adminApplyBtn" onClick={handleApplyAdminLocation} type="button">
-                                                    Set Test Location
-                                                </button>
-                                                <button className="adminResetBtn" onClick={locateUser} type="button">
-                                                    Use Device GPS
-                                                </button>
-                                            </div>
-                                        </div>
+                            {showBuildingSuggestions && !loadingDestinations && (
+                                <ul className="suggestionsList">
+                                    {buildingSuggestions.length > 0 ? (
+                                        buildingSuggestions.map((building) => (
+                                            <li
+                                                key={building.id}
+                                                className="suggestionItem"
+                                                onMouseDown={() => handleSelectBuilding(building)}
+                                            >
+                                                <span className="suggestionName">{building.name}</span>
+                                                <span className="suggestionPlace">
+                                                    {building.code || "Building"}
+                                                    {building.description ? ` · ${building.description}` : ""}
+                                                </span>
+                                            </li>
+                                        ))
+                                    ) : (
+                                        <li className="suggestionEmpty">No building matches your search.</li>
                                     )}
-                                </div>
+                                </ul>
+                            )}
+                        </div>
+                    </div>
 
-                                <button
-                                    className={`directionsBtn${loading ? " directionsBtnLoading" : ""}`}
-                                    onClick={handleGetDirections}
-                                    disabled={loading || (!userLocation && !hasTypedStartLocation) || !selectedBuildingId || loadingDestinations}
-                                >
-                                    {loading ? "Getting directions…" : "Get Directions"}
-                                </button>
+                    {selectedBuildingId && (
+                        <div className="locationSection">
+                            <div className="locationLabel">Destination room (optional)</div>
+                            <div className="locationInputWrap">
+                                <input
+                                    className="locationInput"
+                                    type="text"
+                                    placeholder="Search rooms..."
+                                    value={roomQuery}
+                                    onChange={(e) => handleRoomQueryChange(e.target.value)}
+                                    onFocus={() => setShowRoomSuggestions(true)}
+                                    onBlur={() => setTimeout(() => setShowRoomSuggestions(false), 150)}
+                                />
 
-                                {error && <div className="errorBanner">{error}</div>}
+                                {showRoomSuggestions && (
+                                    <ul className="suggestionsList">
+                                        {roomSuggestions.length > 0 ? (
+                                            roomSuggestions.map((room) => (
+                                                <li
+                                                    key={room.id}
+                                                    className="suggestionItem"
+                                                    onMouseDown={() => handleSelectRoom(room)}
+                                                >
+                                                    <span className="suggestionName">{room.name}</span>
+                                                    <span className="suggestionPlace">
+                                                        {floorNameById.get(room.floorId) || room.floorId}
+                                                        {room.id ? ` · ${room.id}` : ""}
+                                                    </span>
+                                                </li>
+                                            ))
+                                        ) : (
+                                            <li className="suggestionEmpty">No room matches your search.</li>
+                                        )}
+                                    </ul>
+                                )}
                             </div>
                         </div>
-                    ) : (
-                        <div
-                            id="directions-panel"
-                            role="tabpanel"
-                            aria-labelledby="directions-tab"
-                            className="outdoorPanelStack outdoorDirectionsPanel"
+                    )}
+
+                    <div className="locationSection">
+                        <div className="locationLabel">Transportation mode</div>
+                        <select
+                            className="locationInput"
+                            value={transportMode}
+                            onChange={(event) => setTransportMode(event.target.value)}
                         >
-                            {destinationSummaryCard}
+                            {OUTDOOR_TRANSPORT_MODES.map((modeOption) => (
+                                <option key={modeOption.value} value={modeOption.value}>
+                                    {modeOption.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
 
-                            {routeInfo && (
-                                <div className="routeSummarySection">
-                                    <div className="sectionEyebrow">Route overview</div>
-                                    <div className="routeSummary">
-                                        <div className="routeStat">
-                                            <strong className="routeStatNum">
-                                                {formatDuration(routeInfo.durationS)}
-                                            </strong>
-                                            {transportVerb(routeInfo.profile)}
-                                        </div>
-                                        <div className="routeStat">
-                                            <strong className="routeStatNum">
-                                                {formatDistance(routeInfo.distanceM)}
-                                            </strong>
-                                            distance
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
+                    <div className="destRow">
+                        <div className="destDot" />
+                        <div className="destInfo">
+                            <div className="destName">{selectedBuilding?.name || "Choose a destination building"}</div>
+                            <div className="destAddress">
+                                {destinationEntrance
+                                    ? `${destinationEntrance.label} entrance`
+                                    : "No mapped entrance for selected building."}
+                                {selectedRoom ? ` · Room: ${selectedRoom.name}` : ""}
+                            </div>
+                        </div>
+                    </div>
 
-                            {steps.length > 0 ? (
-                                <div className="stepsSection">
-                                    <div className="sectionEyebrow">Walking steps</div>
-                                    <div className="stepsList">
-                                        {steps.map((step, i) => (
-                                            <div
-                                                key={i}
-                                                className={`stepItem${i === activeStep ? " stepItemActive" : ""}`}
-                                                onClick={() => {
-                                                    if (
-                                                        typeof step.location?.lng !== "number"
-                                                        || typeof step.location?.lat !== "number"
-                                                    ) {
-                                                        return;
-                                                    }
-
-                                                    setActiveStep(i);
-                                                    mapRef.current?.flyTo({
-                                                        center: [step.location.lng, step.location.lat],
-                                                        zoom: 17,
-                                                    });
-                                                }}
-                                            >
-                                                <div className="stepIcon">
-                                                    {i === steps.length - 1 ? "⚑" : i + 1}
-                                                </div>
-                                                <div className="stepText">
-                                                    <div className="stepInstruction">
-                                                        {step.instruction}
-                                                    </div>
-                                                    <div className="stepMeta">
-                                                        {formatDistance(step.distanceMeters)}
-                                                        {step.maneuverType ? ` · ${step.maneuverType}` : ""}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="stepsEmpty">
-                                    Select a starting point and destination to preview turn-by-turn outdoor steps.
-                                </div>
-                            )}
+                    {distanceToDestinationMeters !== null && (
+                        <div className={`arrivalStatus${canEnterBuilding ? " arrivalStatusReady" : ""}`}>
+                            {canEnterBuilding
+                                ? `You are at ${selectedBuilding?.name || destinationTarget.label}. Switch to indoor navigation when you are ready.`
+                                : `${formatDistance(distanceToDestinationMeters)} from ${selectedBuilding?.name || destinationTarget.label}.`}
                         </div>
                     )}
+
+                    <div className="adminTools">
+                        <button
+                            className="adminToggleBtn"
+                            onClick={() => setShowAdminTools((prev) => !prev)}
+                            type="button"
+                        >
+                            {showAdminTools ? "Hide Admin Location Tools" : "Show Admin Location Tools"}
+                        </button>
+
+                        {showAdminTools && (
+                            <div className="adminToolsPanel">
+                                <div className="adminToolsLabel">Testing controls: set user location</div>
+
+                                <div className="adminPresetRow">
+                                    {TEST_LOCATION_PRESETS.map((preset) => (
+                                        <button
+                                            key={preset.id}
+                                            className="adminPresetBtn"
+                                            onClick={() => handleUsePresetLocation(preset)}
+                                            type="button"
+                                        >
+                                            {preset.label}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div className="adminCoordRow">
+                                    <input
+                                        className="adminCoordInput"
+                                        type="number"
+                                        step="0.000001"
+                                        value={adminLngInput}
+                                        onChange={(e) => setAdminLngInput(e.target.value)}
+                                        placeholder="Longitude"
+                                    />
+                                    <input
+                                        className="adminCoordInput"
+                                        type="number"
+                                        step="0.000001"
+                                        value={adminLatInput}
+                                        onChange={(e) => setAdminLatInput(e.target.value)}
+                                        placeholder="Latitude"
+                                    />
+                                </div>
+
+                                <div className="adminActionRow">
+                                    <button className="adminApplyBtn" onClick={handleApplyAdminLocation} type="button">
+                                        Set Test Location
+                                    </button>
+                                    <button className="adminResetBtn" onClick={locateUser} type="button">
+                                        Use Device GPS
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <button
+                        className={`directionsBtn${loading ? " directionsBtnLoading" : ""}`}
+                        onClick={handleGetDirections}
+                        disabled={loading || (!userLocation && !hasTypedStartLocation) || !selectedBuildingId || loadingDestinations}
+                    >
+                        {loading ? "Getting directions…" : "Get Directions"}
+                    </button>
+
+                    {error && <div className="errorBanner">{error}</div>}
                 </div>
+
+                {routeInfo && (
+                    <div className="routeSummary">
+                        <div className="routeStat">
+                            <strong className="routeStatNum">
+                                {formatDuration(routeInfo.durationS)}
+                            </strong>
+                            {transportVerb(routeInfo.profile)}
+                        </div>
+                        <div className="routeStat">
+                            <strong className="routeStatNum">
+                                {formatDistance(routeInfo.distanceM)}
+                            </strong>
+                            distance
+                        </div>
+                    </div>
+                )}
+
+                {steps.length > 0 && (
+                    <div className="stepsList">
+                        {steps.map((step, i) => (
+                            <div
+                                key={i}
+                                className={`stepItem${i === activeStep ? " stepItemActive" : ""}`}
+                                onClick={() => {
+                                    if (
+                                        typeof step.location?.lng !== "number"
+                                        || typeof step.location?.lat !== "number"
+                                    ) {
+                                        return;
+                                    }
+
+                                    setActiveStep(i);
+                                    mapRef.current?.flyTo({
+                                        center: [step.location.lng, step.location.lat],
+                                        zoom: 17,
+                                    });
+                                }}
+                            >
+                                <div className="stepIcon">
+                                    {i === steps.length - 1 ? "⚑" : i + 1}
+                                </div>
+                                <div className="stepText">
+                                    <div className="stepInstruction">
+                                        {step.instruction}
+                                    </div>
+                                    <div className="stepMeta">
+                                        {formatDistance(step.distanceMeters)}
+                                        {step.maneuverType ? ` · ${step.maneuverType}` : ""}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
 
                 {canEnterBuilding && onEnterBuilding && (
                     <div className="enterBuildingWrap">
@@ -1384,18 +1249,7 @@ export default function OutdoorNavigation({ onEnterBuilding }) {
                 )}
             </div>
 
-            <div className="outdoorMapShell">
-                <div className="outdoorMapHeader">
-                    <div className="mapEyebrow">Campus approach</div>
-                    <div className="mapHeading">{selectedBuilding?.name || "Choose a building to begin"}</div>
-                    <div className="mapSubheading">
-                        {selectedRoom
-                            ? `Destination room ${selectedRoom.name}.`
-                            : "Walking directions and entrance context appear here once you plan your route."}
-                    </div>
-                </div>
-                <div className="outdoorMapCanvas" ref={mapContainerRef} />
-            </div>
+            <div className="outdoorMapCanvas" ref={mapContainerRef} />
 
             {showLocationSearchModal && (
                 <div
